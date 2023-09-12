@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/types/supabase';
 import { cookies } from 'next/headers';
+import DropdownButton from '@/components/dropdown-button';
 
 const Header = async () => {
-  const supabase = createServerComponentClient<Database>({cookies})
+  const supabase = createServerComponentClient<Database>({cookies});
   const {
     data: {session},
-  } = await supabase.auth.getSession()
+  } = await supabase.auth.getSession();
   return (
     <div className="w-full drop-shadow bg-white sticky top-0 z-30">
       <div className="max-w-5xl mx-auto flex justify-between items-center h-12 px-4 md:px-0">
@@ -23,12 +24,16 @@ const Header = async () => {
             alt="logo"
           />
         </Link>
-        <h1 className="w-full text-center font-bold text-green-700">
+        <h1 className="w-full text-center font-bold text-primary">
           CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN
         </h1>
-        <Link href="/login">
-          <Button variant="secondary">{!session?.user ? 'Đăng nhập' : 'Quản lý'}</Button>
-        </Link>
+        {!!session?.user ? (
+          <DropdownButton />
+        ) : (
+          <Link href="/login">
+            <Button variant="secondary"> Đăng nhập </Button>
+          </Link>
+        )}
       </div>
     </div>
   );
