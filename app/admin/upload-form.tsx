@@ -16,6 +16,7 @@ import { Database } from '@/types/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { convertVietnameseTonesToSlug } from '@/lib/utils';
+import TextEditor from '@/components/text-editor';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { ChangeEvent, useState } from 'react';
 import { ReloadIcon } from '@radix-ui/react-icons';
@@ -200,7 +201,7 @@ export default function UploadForm({
             <FormItem>
               <FormLabel>Nội dung</FormLabel>
               <FormControl>
-                <Textarea placeholder="Nội dung" rows={8} {...field} />
+                <TextEditor placeholder="Nội dung" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
