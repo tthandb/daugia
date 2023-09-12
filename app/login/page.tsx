@@ -1,10 +1,10 @@
 import AuthUI from "./auth-ui";
 
+import { Database } from "@/types/supabase";
+import { createServerSupabaseClient } from "@/app/supabase-actions";
 import { redirect } from "next/navigation";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/types/supabase";
 import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/app/supabase-actions";
 
 async function getSession() {
   const supabase = createServerComponentClient<Database>({ cookies });
@@ -27,8 +27,8 @@ export default async function SignIn() {
   }
 
   return (
-    <div className="flex justify-center height-screen-helper">
-      <div className="flex flex-col justify-between max-w-lg p-3 m-auto w-80 ">
+    <div className="height-screen-helper flex justify-center">
+      <div className="m-auto flex w-80 max-w-lg flex-col justify-between p-3 ">
         <AuthUI />
       </div>
     </div>

@@ -1,10 +1,5 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { useRouter } from 'next/navigation';
-import { ReloadIcon } from '@radix-ui/react-icons';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,12 +12,17 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ChangeEvent, useState } from 'react';
 import { Database } from '@/types/supabase';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from '@/components/ui/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { convertVietnameseTonesToSlug } from '@/lib/utils';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { ChangeEvent, useState } from 'react';
+import { ReloadIcon } from '@radix-ui/react-icons';
+import { useRouter } from 'next/navigation';
+import * as z from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -106,10 +106,7 @@ export default function UploadForm({
 
   async function uploadFile(file: any, slug: string, category: 'image' | 'document') {
     const supabase = createClientComponentClient<Database>();
-    const filePath = `${category}/${slug}-${new Date().valueOf()}.${file.name
-      .split('.')
-      .pop()}`;
-
+    const filePath = `${category}/${slug}-${new Date().valueOf()}.${file.name.split('.').pop()}`;
     const {data, error} = await supabase.storage
       .from(BUCKET)
       .upload(filePath, file as any, {
@@ -203,7 +200,7 @@ export default function UploadForm({
             <FormItem>
               <FormLabel>Nội dung</FormLabel>
               <FormControl>
-                <Textarea placeholder="Nội dung" cols={4} {...field} />
+                <Textarea placeholder="Nội dung" rows={8} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

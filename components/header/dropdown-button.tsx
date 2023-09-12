@@ -1,6 +1,5 @@
 'use client'
 
-import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -10,14 +9,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import * as React from 'react'
 import Link from 'next/link';
-import { ArchiveIcon } from '@radix-ui/react-icons';
+import { ArchiveIcon, HamburgerMenuIcon } from '@radix-ui/react-icons';
 
 export default function DropdownButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline"> <ArchiveIcon className="h-4 w-4" /> </Button>
+        <Button variant="outline"> <HamburgerMenuIcon className="h-4 w-4 text-primary" /> </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
         <DropdownMenuItem>
@@ -28,7 +28,7 @@ export default function DropdownButton() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <form className="w-full" action="/auth/signout" method="post">
+          <form className="w-full" action="/api/auth/signout" method="post">
             <button type="submit" className="w-full">
               Đăng xuất
             </button>
