@@ -4,18 +4,19 @@ import { cn } from '@/lib/utils'
 import React from 'react'
 import Image from 'next/image'
 import dayjs from 'dayjs'
+import { CalendarIcon } from '@radix-ui/react-icons'
 
 export default async function Page({ params }: { params: { slug: string } }) {
   preLoadGetDocumentBySlug(params.slug)
   const document = await getDocumentBySlug(params.slug)
   const others = await getOtherDocuments(params.slug)
   return (
-    <div className='relative mb-[200px] mt-[50px] grid grid-cols-9 gap-x-6 px-4'>
-      <div className='sticky top-20 col-span-2'>
-        <DocumentList title='Các thông báo khác:' className='w-full' data={others as any} />
-      </div>
-      <div className='col-span-5'>
-        <h1 className='scroll-m-20 text-4xl font-bold tracking-tight'>{document?.title}</h1>
+    <div className='relative mb-[200px] grid grid-cols-9 gap-x-6 px-4 pt-[50px]'>
+      <div className='col-span-9 md:col-start-3 md:col-end-8'>
+        <h1 className='scroll-m-20 text-2xl font-bold tracking-tight'>{document?.title}</h1>
+        <p className='text-md flex items-center gap-x-1 leading-7'>
+          <CalendarIcon /> {dayjs(document?.created_at).format('DD/MM/YYYY hh:mm')}
+        </p>
         <p
           className='leading-7 [&:not(:first-child)]:mt-6'
           dangerouslySetInnerHTML={{
@@ -24,7 +25,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
         />
         {document?.img_url && (
           <>
-            <h2 className='mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0'>
+            <h2 className='mt-10 scroll-m-20 border-b pb-2 text-xl font-semibold tracking-tight transition-colors first:mt-0'>
               Hình ảnh
             </h2>
             <div className='mt-2 overflow-hidden rounded-md'>
@@ -38,8 +39,8 @@ export default async function Page({ params }: { params: { slug: string } }) {
             </div>
           </>
         )}
-        <h2 className='mt-10 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0'>
-          Tài liệu
+        <h2 className='mt-5 scroll-m-20 border-b pb-2 text-xl font-semibold tracking-tight transition-colors first:mt-0'>
+          Thông tin bán đấu giá
         </h2>
         <br />
         <br />
@@ -48,9 +49,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
           className='h-[1000px] w-full border-4'
           src={`https://docs.google.com/gview?url=${document?.document_url}&embedded=true`}
         />
-        <p className='text-md text-right italic leading-7 [&:not(:first-child)]:mt-6'>
-          Ngày tạo: {dayjs(document?.created_at).format('DD-MM-YYYY')}.
-        </p>
+        <DocumentList title='Thông báo khác:' className='mt-10 w-full' data={others as any} />
       </div>
     </div>
   )
