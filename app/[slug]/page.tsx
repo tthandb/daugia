@@ -7,6 +7,30 @@ import React from "react"
 import Image from "next/image"
 import dayjs from "dayjs"
 import { CalendarIcon } from "@radix-ui/react-icons"
+import { Metadata } from "next"
+
+interface Props {
+  params: {
+    slug: string
+  }
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const document = await getDocumentBySlug(params.slug)
+  if (!document)
+    return {
+      title: "Not Found",
+      description: "The page is not found"
+    }
+
+  return {
+    title: document.title,
+    description: document.description,
+    alternates: {
+      canonical: "/${document.slug}"
+    }
+  }
+}
 
 export default async function Page({ params }: { params: { slug: string } }) {
   preLoadGetDocumentBySlug(params.slug)

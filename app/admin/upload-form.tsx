@@ -1,160 +1,141 @@
-'use client';
+"use client"
 
+import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Database } from "@/types/supabase"
+import { toast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
+import { convertVietnameseTonesToSlug } from "@/lib/utils"
+import TextEditor from "@/components/text-editor"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { ChangeEvent, useState } from "react"
+import { ReloadIcon } from "@radix-ui/react-icons"
+import { useRouter } from "next/navigation"
+import * as z from "zod"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 
-import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Database } from '@/types/supabase';
-import { toast } from '@/components/ui/use-toast';
-import { Toaster } from '@/components/ui/toaster';
-import { convertVietnameseTonesToSlug } from '@/lib/utils';
-import TextEditor from '@/components/text-editor';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { ChangeEvent, useState } from 'react';
-import { ReloadIcon } from '@radix-ui/react-icons';
-import { useRouter } from 'next/navigation';
-import * as z from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+type Document = Database["public"]["Tables"]["documents"]["Row"]
 
-type Document = Database['public']['Tables']['documents']['Row'];
-
-const BUCKET = 'daugia';
+const BUCKET = "daugia"
 
 const FormSchema = z.object({
   title: z.string().min(2, {
-    message: 'Title must be at least 2 characters.',
+    message: "Title must be at least 2 characters."
   }),
   description: z.any(),
   file: z.any(),
-  image: z.any(),
-});
+  image: z.any()
+})
 
-export default function UploadForm({
-  document,
-  onClose,
-}: {
-  document?: Document | null;
-  onClose?: Function;
-}) {
-  const router = useRouter();
+export default function UploadForm({ document, onClose }: { document?: Document | null; onClose?: Function }) {
+  const router = useRouter()
 
-  const [loading, setLoading] = useState(false);
-  const [image, setImage] = useState<File>();
-  const [docFile, setDocFile] = useState<File>();
+  const [loading, setLoading] = useState(false)
+  const [image, setImage] = useState<File>()
+  const [docFile, setDocFile] = useState<File>()
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      title: document?.title || '',
-      description: document?.description || '',
-    },
-  });
+      title: document?.title || "",
+      description: document?.description || ""
+    }
+  })
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     try {
-      const slug = convertVietnameseTonesToSlug(data.title)
-      setLoading(true);
-      const supabase = createClientComponentClient<Database>();
-      let img_url;
-      let document_url;
+      const slug = convertVietnameseTonesToSlug(data.title) + `-${new Date().valueOf()}`
+      setLoading(true)
+      const supabase = createClientComponentClient<Database>()
+      let img_url
+      let document_url
       if (docFile) {
-        document_url = await uploadFile(docFile, slug, 'document');
+        document_url = await uploadFile(docFile, slug, "document")
       }
       if (image) {
-        img_url = await uploadFile(image, slug, 'image');
+        img_url = await uploadFile(image, slug, "image")
       }
 
       if (!document) {
-        const {error} = await supabase.from('documents').insert([
+        const { error } = await supabase.from("documents").insert([
           {
             title: data.title,
             description: data.description,
             document_url,
             img_url,
-            slug,
-          },
-        ]);
+            slug
+          }
+        ])
         if (!error) {
-          router.push('/congratulations');
+          router.push("/congratulations")
         }
       } else {
         await supabase
-          .from('documents')
+          .from("documents")
           .update({
             title: data.title,
             description: data.description,
             slug,
-            ...(document_url && {document_url}),
-            ...(img_url && {img_url}),
+            ...(document_url && { document_url }),
+            ...(img_url && { img_url })
           })
-          .eq('slug', document.slug || '');
+          .eq("slug", document.slug || "")
       }
-      onClose?.(false);
+      onClose?.(false)
     } catch (e) {
-      console.log(e);
+      console.log(e)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  async function uploadFile(file: any, slug: string, category: 'image' | 'document') {
-    const supabase = createClientComponentClient<Database>();
-    const filePath = `${category}/${slug}-${new Date().valueOf()}.${file.name.split('.').pop()}`;
-    const {data, error} = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, file as any, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+  async function uploadFile(file: any, slug: string, category: "image" | "document") {
+    const supabase = createClientComponentClient<Database>()
+    const filePath = `${category}/${slug}.${file.name.split(".").pop()}`
+    const { data, error } = await supabase.storage.from(BUCKET).upload(filePath, file as any, {
+      cacheControl: "3600",
+      upsert: false
+    })
     if (error) {
       toast({
-        title: 'Lỗi',
+        title: "Lỗi",
         description: `${category} existed`,
-        variant: 'destructive',
-      });
-      return '';
+        variant: "destructive"
+      })
+      return ""
     }
     if (data) {
-      const {data} = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-      return data.publicUrl;
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+      return data.publicUrl
     }
   }
 
   const onImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setImage(e.target.files[0]);
+      setImage(e.target.files[0])
     }
-  };
+  }
 
   const onDocumentChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setDocFile(e.target.files[0]);
+      setDocFile(e.target.files[0])
     }
-  };
+  }
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-y-4"
-      >
+      <form onSubmit={form.handleSubmit(onSubmit)} className='flex flex-col gap-y-4'>
         <FormField
           disabled={loading}
           control={form.control}
-          name="title"
-          render={({field}) => (
+          name='title'
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Tiêu đề</FormLabel>
               <FormControl>
-                <Input placeholder="Tiêu đề" {...field} />
+                <Input placeholder='Tiêu đề' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -163,12 +144,12 @@ export default function UploadForm({
         <FormField
           disabled={loading}
           control={form.control}
-          name="file"
-          render={({field}) => (
+          name='file'
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Tài liệu</FormLabel>
               <FormControl>
-                <Input type="file" {...field} onChange={onDocumentChange} />
+                <Input type='file' {...field} onChange={onDocumentChange} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -177,14 +158,14 @@ export default function UploadForm({
         <FormField
           disabled={loading}
           control={form.control}
-          name="image"
-          render={({field}) => (
+          name='image'
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Ảnh</FormLabel>
               <FormControl>
                 <Input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  type='file'
+                  accept='image/jpeg,image/jpg,image/png,image/webp'
                   {...field}
                   onChange={onImageChange}
                 />
@@ -196,23 +177,23 @@ export default function UploadForm({
         <FormField
           disabled={loading}
           control={form.control}
-          name="description"
-          render={({field}) => (
+          name='description'
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Nội dung</FormLabel>
               <FormControl>
-                <TextEditor placeholder="Nội dung" {...field} />
+                <TextEditor placeholder='Nội dung' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={loading}>
-          {loading && <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />}
+        <Button type='submit' disabled={loading}>
+          {loading && <ReloadIcon className='mr-2 h-4 w-4 animate-spin' />}
           Gửi
         </Button>
       </form>
       <Toaster />
     </Form>
-  );
+  )
 }
