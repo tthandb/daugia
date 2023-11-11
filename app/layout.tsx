@@ -8,7 +8,7 @@ import type { Metadata } from "next"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.dummyblog.com"),
+  metadataBase: new URL(process?.env?.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: {
     default: "Công ty Đấu giá Hợp danh Vĩnh Yên",
     template: `%s | Công ty Đấu giá Hợp danh Vĩnh Yên`
