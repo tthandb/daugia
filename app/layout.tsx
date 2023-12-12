@@ -4,6 +4,7 @@ import SupabaseProvider from "@/context/supabase.context"
 import { cn } from "@/lib/utils"
 import { Inter } from "next/font/google"
 import Script from "next/script"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import type { Metadata } from "next"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
           {children}
         </SupabaseProvider>
+        <SpeedInsights />
       </body>
     </html>
   )
