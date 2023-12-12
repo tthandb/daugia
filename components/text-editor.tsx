@@ -1,21 +1,16 @@
-import { FC } from "react";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import { FC } from "react"
+import ReactQuill from "react-quill"
+import "react-quill/dist/quill.snow.css"
 
 const modules = {
   toolbar: [
     [{ header: [1, 2, false] }],
     ["bold", "italic", "underline", "strike", "blockquote"],
-    [
-      { list: "ordered" },
-      { list: "bullet" },
-      { indent: "-1" },
-      { indent: "+1" },
-    ],
+    [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
     ["link", "image"],
-    ["clean"],
-  ],
-};
+    ["clean"]
+  ]
+}
 
 const formats = [
   "header",
@@ -28,30 +23,30 @@ const formats = [
   "bullet",
   "indent",
   "link",
-  "image",
-];
+  "image"
+]
 
 interface OnChangeHandler {
-  (e: any): void;
+  (e: any): void
 }
 
 type Props = {
-  value?: string;
-  placeholder?: string;
-  onChange?: OnChangeHandler;
-};
+  value?: string
+  placeholder?: string
+  onChange?: OnChangeHandler
+}
 
 const TextEditor: FC<Props> = ({ value, onChange, placeholder }) => {
   return (
     <ReactQuill
-      theme="snow"
+      theme='snow'
       modules={modules}
       formats={formats}
       value={value || ""}
       onChange={onChange}
       placeholder={placeholder}
     />
-  );
-};
+  )
+}
 
-export default TextEditor;
+export default TextEditor

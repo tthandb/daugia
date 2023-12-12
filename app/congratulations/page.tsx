@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import React from "react";
-import Link from "next/link";
+import { Button } from "@/components/ui/button"
+import React from "react"
+import Link from "next/link"
 
 function Page() {
   return (
@@ -10,7 +10,7 @@ function Page() {
         <Button>Trở về</Button>
       </Link>
     </div>
-  );
+  )
 }
 
-export default Page;
+export default Page

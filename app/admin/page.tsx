@@ -1,9 +1,9 @@
-import { Database } from '@/types/supabase'
-import { Button } from '@/components/ui/button'
-import { getDocumentList } from '@/app/supabase-actions'
-import Content from '@/app/admin/content'
-import { cookies } from 'next/headers'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Database } from "@/types/supabase"
+import { Button } from "@/components/ui/button"
+import { getDocumentList } from "@/app/supabase-actions"
+import Content from "@/app/admin/content"
+import { cookies } from "next/headers"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default async function Account() {
   const supabase = createServerComponentClient<Database>({ cookies })

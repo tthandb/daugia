@@ -1,4 +1,4 @@
-'use client'
+"use client"
 import {
   Dialog,
   DialogContent,
@@ -6,17 +6,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger
-} from '@/components/ui/dialog'
-import { DataTable } from '@/app/admin/data-table'
-import UploadForm from '@/app/admin/upload-form'
-import { Database } from '@/types/supabase'
-import { Button } from '@/components/ui/button'
-import React, { useState } from 'react'
-import { ColumnDef } from '@tanstack/react-table'
-import dayjs from 'dayjs'
-import Link from 'next/link'
+} from "@/components/ui/dialog"
+import { DataTable } from "@/app/admin/data-table"
+import UploadForm from "@/app/admin/upload-form"
+import { Database } from "@/types/supabase"
+import { Button } from "@/components/ui/button"
+import React, { useState } from "react"
+import { ColumnDef } from "@tanstack/react-table"
+import dayjs from "dayjs"
+import Link from "next/link"
 
-type Document = Database['public']['Tables']['documents']['Row']
+type Document = Database["public"]["Tables"]["documents"]["Row"]
 
 function Content({ documents }: { documents: Document[] }) {
   const [open, setOpen] = useState(false)
@@ -24,11 +24,11 @@ function Content({ documents }: { documents: Document[] }) {
 
   const columns: ColumnDef<Document>[] = [
     {
-      header: 'Ngày tạo',
-      cell: ({ row }) => <p> {dayjs(row.original.created_at).format('DD/MM/YYYY')} </p>
+      header: "Ngày tạo",
+      cell: ({ row }) => <p> {dayjs(row.original.created_at).format("DD/MM/YYYY")} </p>
     },
     {
-      header: 'Bài viết',
+      header: "Bài viết",
       cell: ({ row }) => {
         const document = row.original
         return (
@@ -39,7 +39,7 @@ function Content({ documents }: { documents: Document[] }) {
       }
     },
     {
-      id: 'actions',
+      id: "actions",
       enableHiding: false,
       header: () => (
         <DialogTrigger onClick={() => setDocument(null)}>
@@ -61,7 +61,7 @@ function Content({ documents }: { documents: Document[] }) {
       <DataTable columns={columns} data={documents} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className='text-center'>{!!document ? 'Chỉnh sửa' : 'Thêm mới'} bài viết</DialogTitle>
+          <DialogTitle className='text-center'>{!!document ? "Chỉnh sửa" : "Thêm mới"} bài viết</DialogTitle>
           <DialogDescription>
             <UploadForm onClose={setOpen} document={document} />
           </DialogDescription>
