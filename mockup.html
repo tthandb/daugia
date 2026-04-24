@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ĐẤUGIÁ — Cổng Nghiên Cứu Bất Động Sản</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,900;1,400;1,600&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --c-charcoal:   #1C1917;
+  --c-charcoal2:  #2C2825;
+  --c-charcoal3:  #3C3733;
+  --c-gold:       #A16207;
+  --c-gold-light: #CA8A04;
+  --c-gold-pale:  #FEF3C7;
+  --c-warm-white: #FAFAF9;
+  --c-white:      #FFFFFF;
+  --c-fg:         #0C0A09;
+  --c-muted:      #E8ECF0;
+  --c-muted-fg:   #78716C;
+  --c-border:     #D6D3D1;
+  --c-red:        #DC2626;
+
+  --f-heading: 'Playfair Display', serif;
+  --f-body:    'Be Vietnam Pro', sans-serif;
+
+  --shadow-sm:  0 1px 3px rgba(28,25,23,.08), 0 1px 2px rgba(28,25,23,.05);
+  --shadow-md:  0 4px 16px rgba(28,25,23,.10), 0 2px 6px rgba(28,25,23,.07);
+  --shadow-lg:  0 16px 48px rgba(28,25,23,.14), 0 4px 12px rgba(28,25,23,.08);
+  --shadow-gold: 0 4px 24px rgba(161,98,7,.18);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--f-body);
+  background: var(--c-warm-white);
+  color: var(--c-fg);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ─── PAGE SWITCHER ──────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ─── GLOBAL NAV ─────────────────────────────────── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--c-white);
+  border-bottom: 1px solid var(--c-border);
+  height: 64px;
+  display: flex;
+  align-items: center;
+}
+.nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.nav-logo {
+  font-family: var(--f-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: .15em;
+  color: var(--c-charcoal);
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-logo span { color: var(--c-gold); }
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  list-style: none;
+}
+.nav-links a {
+  font-family: var(--f-body);
+  font-size: .75rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--c-muted-fg);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color .2s;
+  position: relative;
+  padding-bottom: 2px;
+}
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0; right: 100%;
+  height: 1px;
+  background: var(--c-gold);
+  transition: right .25s ease;
+}
+.nav-links a:hover { color: var(--c-charcoal); }
+.nav-links a:hover::after { right: 0; }
+.nav-links a.active-link { color: var(--c-charcoal); font-weight: 600; }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.nav-search-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-muted-fg);
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  transition: color .2s;
+}
+.nav-search-btn:hover { color: var(--c-charcoal); }
+.nav-admin-btn {
+  font-family: var(--f-body);
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--c-charcoal);
+  background: none;
+  border: 1px solid var(--c-border);
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.nav-admin-btn:hover {
+  background: var(--c-charcoal);
+  color: var(--c-warm-white);
+  border-color: var(--c-charcoal);
+}
+
+/* ─── TICKER ─────────────────────────────────────── */
+.ticker {
+  background: var(--c-charcoal);
+  color: var(--c-gold-pale);
+  height: 32px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+.ticker-track {
+  display: flex;
+  gap: 3rem;
+  animation: ticker-scroll 30s linear infinite;
+  white-space: nowrap;
+  padding-left: 100%;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-item {
+  font-size: .65rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.ticker-item .up   { color: #4ADE80; }
+.ticker-item .down { color: #F87171; }
+.ticker-divider { color: var(--c-charcoal3); }
+
+/* ─── HERO ───────────────────────────────────────── */
+.hero {
+  background: var(--c-charcoal);
+  position: relative;
+  overflow: hidden;
+  min-height: 540px;
+  display: flex;
+  align-items: center;
+}
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: .4;
+  pointer-events: none;
+}
+.hero-gold-line {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c-gold), transparent);
+  opacity: .5;
+}
+.hero-accent {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 42%;
+  background: linear-gradient(135deg, transparent 0%, rgba(161,98,7,.07) 100%);
+  pointer-events: none;
+}
+.hero-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 5rem 2rem;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+.hero-tag {
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+.hero-tag::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: var(--c-gold);
+}
+.hero h1 {
+  font-family: var(--f-heading);
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--c-warm-white);
+  letter-spacing: .02em;
+  margin-bottom: 1.25rem;
+}
+.hero p {
+  font-size: .95rem;
+  color: #A8A29E;
+  line-height: 1.8;
+  margin-bottom: 2rem;
+  max-width: 440px;
+}
+.hero-ctas {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.btn-primary {
+  font-family: var(--f-body);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  background: var(--c-gold);
+  color: var(--c-white);
+  border: none;
+  padding: 14px 28px;
+  cursor: pointer;
+  transition: all .25s;
+  box-shadow: var(--shadow-gold);
+}
+.btn-primary:hover {
+  background: var(--c-gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(161,98,7,.28);
+}
+.btn-ghost {
+  font-family: var(--f-body);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  background: none;
+  color: #A8A29E;
+  border: 1px solid #3C3733;
+  padding: 13px 24px;
+  cursor: pointer;
+  transition: all .25s;
+}
+.btn-ghost:hover { border-color: #A8A29E; color: var(--c-warm-white); }
+.hero-featured-card {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  backdrop-filter: blur(8px);
+  padding: 1.75rem;
+  cursor: pointer;
+  transition: all .3s;
+  position: relative;
+  overflow: hidden;
+}
+.hero-featured-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--c-gold), transparent);
+}
+.hero-featured-card:hover {
+  background: rgba(255,255,255,.07);
+  transform: translateY(-2px);
+}
+.hero-card-tag {
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: 1rem;
+}
+.hero-card-title {
+  font-family: var(--f-heading);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--c-warm-white);
+  line-height: 1.35;
+  margin-bottom: 1rem;
+}
+.hero-card-meta {
+  font-size: .7rem;
+  color: #78716C;
+  letter-spacing: .05em;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.hero-card-img {
+  width: 100%;
+  height: 180px;
+  background: linear-gradient(135deg, #2C2825 0%, #1C1917 100%);
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.hero-card-img svg { opacity: .15; }
+.hero-card-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(161,98,7,.15) 0%, transparent 70%);
+}
+
+/* ─── SECTION LABELS ─────────────────────────────── */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.section-label-text {
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+}
+.section-label-line {
+  flex: 1;
+  height: 1px;
+  background: var(--c-border);
+}
+
+/* ─── CATEGORY FILTERS ───────────────────────────── */
+.filter-strip {
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-white);
+}
+.filter-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filter-inner::-webkit-scrollbar { display: none; }
+.filter-pill {
+  font-family: var(--f-body);
+  font-size: .67rem;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 14px 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--c-muted-fg);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all .2s;
+  margin-bottom: -1px;
+}
+.filter-pill:hover { color: var(--c-charcoal); }
+.filter-pill.active {
+  color: var(--c-charcoal);
+  border-bottom-color: var(--c-gold);
+  font-weight: 600;
+}
+
+/* ─── ARTICLE GRID ───────────────────────────────── */
+.section-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+}
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+.article-card {
+  background: var(--c-white);
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: all .28s ease;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.article-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--c-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .3s ease;
+}
+.article-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+.article-card:hover::after { transform: scaleX(1); }
+.card-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: var(--c-muted);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; }
+.card-category {
+  display: inline-flex;
+  align-items: center;
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  background: var(--c-gold-pale);
+  padding: 3px 10px;
+  margin-bottom: .85rem;
+  border: 1px solid rgba(161,98,7,.2);
+}
+.card-title {
+  font-family: var(--f-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--c-charcoal);
+  margin-bottom: .6rem;
+  letter-spacing: .01em;
+}
+.card-excerpt {
+  font-size: .82rem;
+  color: var(--c-muted-fg);
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .68rem;
+  color: var(--c-muted-fg);
+  letter-spacing: .04em;
+  border-top: 1px solid var(--c-muted);
+  padding-top: .85rem;
+  margin-top: auto;
+}
+.card-meta-left { display: flex; align-items: center; gap: .6rem; }
+.card-meta-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--c-border); }
+.card-view-count { display: flex; align-items: center; gap: .3rem; }
+
+/* ─── FEATURED ROW ───────────────────────────────── */
+.featured-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+.featured-card-large {
+  background: var(--c-charcoal);
+  cursor: pointer;
+  transition: all .3s;
+  position: relative;
+  overflow: hidden;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2rem;
+}
+.featured-card-large::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(12,10,9,.9) 0%, rgba(12,10,9,.3) 60%, transparent 100%);
+  z-index: 1;
+}
+.featured-card-large-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #2a2520 0%, #1a1714 100%);
+}
+.featured-card-large-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: .06;
+  background-image: repeating-linear-gradient(45deg, var(--c-gold) 0, var(--c-gold) 1px, transparent 0, transparent 50%);
+  background-size: 20px 20px;
+}
+.featured-card-large-content { position: relative; z-index: 2; }
+.featured-card-large:hover { transform: scale(1.01); }
+.featured-large-tag {
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: .75rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.featured-large-title {
+  font-family: var(--f-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--c-warm-white);
+  line-height: 1.25;
+  margin-bottom: .75rem;
+}
+.featured-large-meta {
+  font-size: .68rem;
+  color: #78716C;
+  letter-spacing: .05em;
+}
+.featured-side-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.featured-side-card {
+  background: var(--c-white);
+  border: 1px solid var(--c-border);
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all .25s;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  position: relative;
+}
+.featured-side-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--c-gold);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform .25s;
+}
+.featured-side-card:hover { box-shadow: var(--shadow-sm); transform: translateX(3px); }
+.featured-side-card:hover::before { transform: scaleY(1); }
+.side-card-thumb {
+  width: 80px;
+  height: 60px;
+  background: var(--c-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.side-card-body { flex: 1; min-width: 0; }
+.side-card-cat {
+  font-size: .57rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: .35rem;
+}
+.side-card-title {
+  font-family: var(--f-heading);
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+  line-height: 1.35;
+  margin-bottom: .35rem;
+}
+.side-card-meta {
+  font-size: .65rem;
+  color: var(--c-muted-fg);
+}
+
+/* ─── STATS BAR ──────────────────────────────────── */
+.stats-bar {
+  background: var(--c-charcoal);
+  border-top: 1px solid #2C2825;
+  border-bottom: 1px solid #2C2825;
+}
+.stats-bar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+.stat-item { text-align: center; position: relative; }
+.stat-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 20%; bottom: 20%;
+  width: 1px;
+  background: #2C2825;
+}
+.stat-value {
+  font-family: var(--f-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--c-warm-white);
+  margin-bottom: .25rem;
+  letter-spacing: .03em;
+}
+.stat-value span { color: var(--c-gold); font-size: 1.2rem; }
+.stat-label {
+  font-size: .65rem;
+  font-weight: 500;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: #78716C;
+}
+
+/* ─── FOOTER ─────────────────────────────────────── */
+footer {
+  background: var(--c-charcoal);
+  border-top: 1px solid #2C2825;
+  padding: 3rem 2rem 1.5rem;
+}
+.footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.footer-top {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 3rem;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid #2C2825;
+  margin-bottom: 1.5rem;
+}
+.footer-logo {
+  font-family: var(--f-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .15em;
+  color: var(--c-warm-white);
+  margin-bottom: 1rem;
+}
+.footer-logo span { color: var(--c-gold); }
+.footer-desc {
+  font-size: .78rem;
+  color: #78716C;
+  line-height: 1.75;
+  max-width: 260px;
+}
+.footer-col-title {
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: 1rem;
+}
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+.footer-links a {
+  font-size: .78rem;
+  color: #78716C;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color .2s;
+}
+.footer-links a:hover { color: var(--c-warm-white); }
+.footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .68rem;
+  color: #57534E;
+  letter-spacing: .05em;
+}
+
+/* ─── ARTICLES PAGE ──────────────────────────────── */
+.articles-layout {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 3rem;
+}
+.sidebar {
+  position: sticky;
+  top: 100px;
+  align-self: start;
+}
+.sidebar-section { margin-bottom: 2rem; }
+.sidebar-title {
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: 1rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--c-border);
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .55rem 0;
+  font-size: .8rem;
+  color: var(--c-muted-fg);
+  cursor: pointer;
+  border-bottom: 1px solid var(--c-muted);
+  transition: color .2s;
+}
+.sidebar-item:hover { color: var(--c-charcoal); }
+.sidebar-item.active { color: var(--c-charcoal); font-weight: 600; }
+.sidebar-count {
+  font-size: .68rem;
+  background: var(--c-muted);
+  color: var(--c-muted-fg);
+  padding: 1px 7px;
+}
+.articles-main {}
+.articles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--c-border);
+}
+.articles-count {
+  font-size: .78rem;
+  color: var(--c-muted-fg);
+  letter-spacing: .04em;
+}
+.articles-count strong { color: var(--c-charcoal); }
+.sort-select {
+  font-family: var(--f-body);
+  font-size: .72rem;
+  letter-spacing: .07em;
+  border: 1px solid var(--c-border);
+  background: var(--c-white);
+  color: var(--c-charcoal);
+  padding: 7px 12px;
+  cursor: pointer;
+  outline: none;
+}
+.search-bar-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--c-border);
+  background: var(--c-white);
+  margin-bottom: 1.5rem;
+  transition: border-color .2s;
+}
+.search-bar-wrap:focus-within { border-color: var(--c-gold); }
+.search-bar {
+  font-family: var(--f-body);
+  font-size: .85rem;
+  border: none;
+  outline: none;
+  padding: 10px 14px;
+  flex: 1;
+  background: transparent;
+  color: var(--c-charcoal);
+  letter-spacing: .04em;
+}
+.search-bar::placeholder { color: var(--c-muted-fg); }
+.search-bar-icon {
+  padding: 10px 14px;
+  color: var(--c-muted-fg);
+  display: flex;
+}
+.list-article-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  margin-top: 3rem;
+}
+.page-btn {
+  font-family: var(--f-body);
+  font-size: .75rem;
+  font-weight: 500;
+  letter-spacing: .07em;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--c-border);
+  background: var(--c-white);
+  cursor: pointer;
+  transition: all .2s;
+  color: var(--c-muted-fg);
+}
+.page-btn:hover, .page-btn.active {
+  background: var(--c-charcoal);
+  color: var(--c-warm-white);
+  border-color: var(--c-charcoal);
+}
+
+/* ─── ARTICLE DETAIL ─────────────────────────────── */
+.article-detail-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: 200px 1fr 220px;
+  gap: 3rem;
+}
+.article-toc {
+  position: sticky;
+  top: 100px;
+  align-self: start;
+}
+.toc-title {
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: 1rem;
+}
+.toc-list { list-style: none; }
+.toc-item {
+  font-size: .75rem;
+  color: var(--c-muted-fg);
+  padding: .4rem 0 .4rem .75rem;
+  border-left: 2px solid var(--c-border);
+  cursor: pointer;
+  transition: all .2s;
+  line-height: 1.4;
+}
+.toc-item:hover, .toc-item.active {
+  color: var(--c-charcoal);
+  border-left-color: var(--c-gold);
+  font-weight: 500;
+}
+.toc-item.sub { padding-left: 1.5rem; font-size: .7rem; }
+.article-content {}
+.article-breadcrumb {
+  font-size: .68rem;
+  color: var(--c-muted-fg);
+  letter-spacing: .06em;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.article-breadcrumb span { color: var(--c-border); }
+.article-category-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  background: var(--c-gold-pale);
+  padding: 4px 12px;
+  border: 1px solid rgba(161,98,7,.2);
+  margin-bottom: 1rem;
+}
+.article-title {
+  font-family: var(--f-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--c-charcoal);
+  letter-spacing: .02em;
+  margin-bottom: 1.25rem;
+}
+.article-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: .72rem;
+  color: var(--c-muted-fg);
+  letter-spacing: .05em;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 2rem;
+}
+.article-meta-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--c-border); }
+.article-hero-img {
+  width: 100%;
+  height: 320px;
+  background: linear-gradient(135deg, #E8ECF0 0%, #D6D3D1 100%);
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.article-hero-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(161,98,7,.08) 0%, transparent 70%);
+}
+.article-body {}
+.article-body h2 {
+  font-family: var(--f-heading);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+  letter-spacing: .02em;
+  margin: 2rem 0 .75rem;
+}
+.article-body h3 {
+  font-family: var(--f-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+  margin: 1.5rem 0 .6rem;
+}
+.article-body p {
+  font-size: .92rem;
+  line-height: 1.85;
+  color: #3C3733;
+  margin-bottom: 1.25rem;
+}
+.article-body blockquote {
+  border-left: 3px solid var(--c-gold);
+  padding: 1rem 1.5rem;
+  margin: 2rem 0;
+  background: var(--c-gold-pale);
+  font-size: .95rem;
+  line-height: 1.75;
+  color: var(--c-charcoal);
+  font-style: italic;
+  font-weight: 300;
+}
+.article-body .data-highlight {
+  background: var(--c-charcoal);
+  color: var(--c-warm-white);
+  padding: 1.5rem;
+  margin: 2rem 0;
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 1.5rem;
+  text-align: center;
+}
+.data-highlight-item .number {
+  font-family: var(--f-heading);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--c-gold);
+  display: block;
+  margin-bottom: .25rem;
+}
+.data-highlight-item .label {
+  font-size: .65rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #78716C;
+}
+.article-author-block {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.author-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--c-charcoal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-gold);
+  font-family: var(--f-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.author-info .name {
+  font-family: var(--f-heading);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+  margin-bottom: .2rem;
+}
+.author-info .role {
+  font-size: .72rem;
+  color: var(--c-muted-fg);
+  letter-spacing: .05em;
+}
+.article-sidebar {
+  position: sticky;
+  top: 100px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.article-sidebar-widget {}
+.widget-title {
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+  margin-bottom: 1rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--c-border);
+}
+.related-article {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: .75rem 0;
+  border-bottom: 1px solid var(--c-muted);
+  cursor: pointer;
+  transition: padding-left .2s;
+}
+.related-article:hover { padding-left: .5rem; }
+.related-cat {
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--c-gold);
+}
+.related-title {
+  font-family: var(--f-heading);
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+  line-height: 1.35;
+}
+.related-date {
+  font-size: .65rem;
+  color: var(--c-muted-fg);
+}
+.tag-cloud { display: flex; flex-wrap: wrap; gap: .5rem; }
+.tag-pill {
+  font-size: .62rem;
+  font-weight: 500;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid var(--c-border);
+  color: var(--c-muted-fg);
+  cursor: pointer;
+  transition: all .2s;
+}
+.tag-pill:hover {
+  border-color: var(--c-gold);
+  color: var(--c-gold);
+  background: var(--c-gold-pale);
+}
+
+/* ─── ADMIN ──────────────────────────────────────── */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: calc(100vh - 64px);
+}
+.admin-sidebar {
+  background: var(--c-charcoal);
+  padding: 2rem 0;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.admin-sidebar-logo {
+  font-family: var(--f-heading);
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: var(--c-warm-white);
+  padding: 0 1.5rem 1.5rem;
+  border-bottom: 1px solid #2C2825;
+  margin-bottom: 1.5rem;
+}
+.admin-sidebar-logo span { color: var(--c-gold); }
+.admin-nav-section { margin-bottom: 1.5rem; padding: 0 1.5rem; }
+.admin-nav-label {
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #57534E;
+  margin-bottom: .75rem;
+}
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .65rem .75rem;
+  font-size: .78rem;
+  font-weight: 500;
+  letter-spacing: .05em;
+  color: #A8A29E;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all .2s;
+  margin-bottom: 2px;
+}
+.admin-nav-item svg { flex-shrink: 0; }
+.admin-nav-item:hover { background: rgba(255,255,255,.05); color: var(--c-warm-white); }
+.admin-nav-item.active {
+  background: rgba(161,98,7,.15);
+  color: var(--c-gold);
+  border-left: 2px solid var(--c-gold);
+  margin-left: -2px;
+}
+.admin-nav-badge {
+  margin-left: auto;
+  font-size: .6rem;
+  background: var(--c-gold);
+  color: var(--c-white);
+  padding: 1px 6px;
+  font-weight: 600;
+}
+.admin-content { padding: 2.5rem; background: var(--c-warm-white); }
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+.admin-title {
+  font-family: var(--f-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--c-charcoal);
+  letter-spacing: .02em;
+}
+.admin-subtitle {
+  font-size: .78rem;
+  color: var(--c-muted-fg);
+  margin-top: .25rem;
+  letter-spacing: .04em;
+}
+.btn-upload {
+  font-family: var(--f-body);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--c-charcoal);
+  color: var(--c-warm-white);
+  border: none;
+  padding: 12px 22px;
+  cursor: pointer;
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.btn-upload:hover { background: var(--c-charcoal3); }
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+.stat-card {
+  background: var(--c-white);
+  border: 1px solid var(--c-border);
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--c-gold);
+}
+.stat-card-label {
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--c-muted-fg);
+  margin-bottom: .75rem;
+}
+.stat-card-value {
+  font-family: var(--f-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--c-charcoal);
+  margin-bottom: .25rem;
+}
+.stat-card-change {
+  font-size: .7rem;
+  color: #22C55E;
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+}
+.stat-card-change.down { color: var(--c-red); }
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+}
+.admin-table-wrap {
+  background: var(--c-white);
+  border: 1px solid var(--c-border);
+}
+.admin-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--c-border);
+}
+.admin-table-title {
+  font-family: var(--f-heading);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+}
+.admin-table-search {
+  font-family: var(--f-body);
+  font-size: .78rem;
+  border: 1px solid var(--c-border);
+  padding: 7px 12px;
+  outline: none;
+  color: var(--c-charcoal);
+  width: 200px;
+  transition: border-color .2s;
+}
+.admin-table-search:focus { border-color: var(--c-gold); }
+table { width: 100%; border-collapse: collapse; }
+th {
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--c-muted-fg);
+  text-align: left;
+  padding: .75rem 1.5rem;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-warm-white);
+}
+td {
+  font-size: .8rem;
+  color: var(--c-charcoal);
+  padding: .9rem 1.5rem;
+  border-bottom: 1px solid var(--c-muted);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--c-warm-white); }
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: .6rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  gap: .35rem;
+}
+.status-badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.status-badge.published { color: #16A34A; background: #DCFCE7; }
+.status-badge.published::before { background: #16A34A; }
+.status-badge.draft { color: #78716C; background: #F5F5F4; }
+.status-badge.draft::before { background: #78716C; }
+.status-badge.archived { color: #9CA3AF; background: #F9FAFB; }
+.status-badge.archived::before { background: #9CA3AF; }
+.table-actions { display: flex; gap: .5rem; align-items: center; }
+.table-btn {
+  font-family: var(--f-body);
+  font-size: .62rem;
+  font-weight: 500;
+  letter-spacing: .08em;
+  padding: 4px 10px;
+  border: 1px solid var(--c-border);
+  background: none;
+  cursor: pointer;
+  color: var(--c-muted-fg);
+  transition: all .2s;
+}
+.table-btn:hover { border-color: var(--c-charcoal); color: var(--c-charcoal); }
+.table-btn.danger:hover { border-color: var(--c-red); color: var(--c-red); }
+.upload-widget {
+  background: var(--c-white);
+  border: 1px solid var(--c-border);
+}
+.upload-widget-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--c-border);
+  font-family: var(--f-heading);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--c-charcoal);
+}
+.upload-widget-body { padding: 1.5rem; }
+.drop-zone {
+  border: 2px dashed var(--c-border);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all .25s;
+  margin-bottom: 1.25rem;
+  position: relative;
+  background: var(--c-warm-white);
+}
+.drop-zone:hover {
+  border-color: var(--c-gold);
+  background: var(--c-gold-pale);
+}
+.drop-zone svg { color: var(--c-muted-fg); margin: 0 auto .75rem; display: block; }
+.drop-zone-text {
+  font-size: .78rem;
+  color: var(--c-muted-fg);
+  line-height: 1.6;
+  letter-spacing: .03em;
+}
+.drop-zone-text strong { color: var(--c-gold); cursor: pointer; }
+.drop-zone-types {
+  font-size: .65rem;
+  color: var(--c-border);
+  letter-spacing: .08em;
+  margin-top: .5rem;
+  text-transform: uppercase;
+}
+.form-group { margin-bottom: 1rem; }
+.form-label {
+  display: block;
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--c-muted-fg);
+  margin-bottom: .4rem;
+}
+.form-input, .form-select, .form-textarea {
+  font-family: var(--f-body);
+  font-size: .82rem;
+  width: 100%;
+  border: 1px solid var(--c-border);
+  padding: 9px 12px;
+  outline: none;
+  color: var(--c-charcoal);
+  background: var(--c-white);
+  transition: border-color .2s;
+  letter-spacing: .03em;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--c-gold); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.btn-submit {
+  font-family: var(--f-body);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--c-gold);
+  color: var(--c-white);
+  border: none;
+  padding: 11px 20px;
+  cursor: pointer;
+  width: 100%;
+  transition: all .2s;
+  margin-top: .5rem;
+}
+.btn-submit:hover { background: var(--c-gold-light); }
+
+/* ─── PAGE HEADER ────────────────────────────────── */
+.page-header {
+  background: var(--c-charcoal);
+  padding: 2.5rem 2rem;
+}
+.page-header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.page-header h2 {
+  font-family: var(--f-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--c-warm-white);
+  letter-spacing: .03em;
+}
+.page-header p {
+  font-size: .82rem;
+  color: #78716C;
+  margin-top: .35rem;
+  letter-spacing: .04em;
+}
+.breadcrumb {
+  font-size: .67rem;
+  color: #57534E;
+  letter-spacing: .08em;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.breadcrumb a { color: var(--c-gold); cursor: pointer; }
+
+/* ─── UTILITY ────────────────────────────────────── */
+.divider { height: 1px; background: var(--c-border); }
+.gold-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--c-gold), transparent); opacity: .4; }
+svg { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ NAV -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" onclick="showPage('home')">ĐẤUGIÁ<span>.</span></a>
+    <ul class="nav-links">
+      <li><a onclick="showPage('home')" id="nav-home" class="active-link">Nghiên Cứu</a></li>
+      <li><a onclick="showPage('articles')" id="nav-articles">Thị Trường</a></li>
+      <li><a href="#">Đấu Giá</a></li>
+      <li><a href="#">Giới Thiệu</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="nav-search-btn">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <button class="nav-admin-btn" onclick="showPage('admin')">Quản Trị</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════ HOME PAGE -->
+<div class="page active" id="page-home">
+
+  <!-- Ticker -->
+  <div class="ticker">
+    <div class="ticker-track">
+      <div class="ticker-item">Nhà Ở TP.HCM <span class="up">▲ 8,4%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Văn Phòng Hà Nội <span class="up">▲ 3,1%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Đất Công Nghiệp Phía Bắc <span class="up">▲ 12,7%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Khối Lượng Đấu Giá Q1 2025 <span class="up">▲ 24,3%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Ven Biển Đà Nẵng <span class="down">▼ 2,1%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Bán Lẻ Thương Mại CBD <span class="up">▲ 5,8%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Nhà Ở TP.HCM <span class="up">▲ 8,4%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Văn Phòng Hà Nội <span class="up">▲ 3,1%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Đất Công Nghiệp Phía Bắc <span class="up">▲ 12,7%</span></div>
+      <span class="ticker-divider">·</span>
+      <div class="ticker-item">Khối Lượng Đấu Giá Q1 2025 <span class="up">▲ 24,3%</span></div>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-grain"></div>
+    <div class="hero-accent"></div>
+    <div class="hero-gold-line"></div>
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-tag">Thông Tin Thị Trường</div>
+        <h1>Nghiên Cứu Cao Cấp Cho Chuyên Gia Đấu Giá</h1>
+        <p>Phân tích chuyên sâu về thị trường bất động sản Việt Nam — nhà ở, thương mại và công nghiệp. Hỗ trợ các nhà đầu tư liên doanh bằng dữ liệu thực chứng.</p>
+        <div class="hero-ctas">
+          <button class="btn-primary" onclick="showPage('articles')">Xem Nghiên Cứu</button>
+          <button class="btn-ghost" onclick="showPage('article')">Báo Cáo Mới Nhất</button>
+        </div>
+      </div>
+      <div class="hero-featured">
+        <div class="hero-featured-card" onclick="showPage('article')">
+          <div class="hero-card-img">
+            <svg width="48" height="48" fill="none" stroke="#A16207" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <div class="hero-card-img-overlay"></div>
+          </div>
+          <div class="hero-card-tag">Nổi Bật · Báo Cáo Đấu Giá</div>
+          <div class="hero-card-title">Thị Trường Đấu Giá Bất Động Sản Việt Nam — Triển Vọng Giữa Năm 2025</div>
+          <div class="hero-card-meta">
+            <span>Nguyễn Minh Khoa</span>
+            <span>·</span>
+            <span>Tháng 3, 2025</span>
+            <span>·</span>
+            <span>12 phút đọc</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filter Strip -->
+  <div class="filter-strip">
+    <div class="filter-inner">
+      <button class="filter-pill active">Tất Cả</button>
+      <button class="filter-pill">Nhà Ở</button>
+      <button class="filter-pill">Thương Mại</button>
+      <button class="filter-pill">Công Nghiệp</button>
+      <button class="filter-pill">Đất Đai</button>
+      <button class="filter-pill">Báo Cáo Đấu Giá</button>
+      <button class="filter-pill">Dữ Liệu Thị Trường</button>
+      <button class="filter-pill">Pháp Lý</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="section-wrap">
+
+    <!-- Section Label -->
+    <div class="section-label">
+      <span class="section-label-text">Báo Cáo Nổi Bật</span>
+      <div class="section-label-line"></div>
+    </div>
+
+    <!-- Featured Row -->
+    <div class="featured-row">
+      <div class="featured-card-large" onclick="showPage('article')">
+        <div class="featured-card-large-bg"></div>
+        <div class="featured-card-large-pattern"></div>
+        <div class="featured-card-large-content">
+          <div class="featured-large-tag">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+            Báo Cáo Đấu Giá · Q1 2025
+          </div>
+          <div class="featured-large-title">Khối Lượng Đấu Giá Bắt Buộc Tại TP.HCM Tăng 24% Khi Khung Pháp Lý Hoàn Thiện</div>
+          <div class="featured-large-meta">Trần Thị Lan · 15 tháng 3, 2025 · 18 phút đọc</div>
+        </div>
+      </div>
+      <div class="featured-side-cards">
+        <div class="featured-side-card" onclick="showPage('article')">
+          <div class="side-card-thumb">
+            <svg width="24" height="24" fill="none" stroke="#D6D3D1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="side-card-body">
+            <div class="side-card-cat">Thương Mại</div>
+            <div class="side-card-title">Văn Phòng CBD Hà Nội Phục Hồi — Tỷ Lệ Trống Hạng A Giảm Xuống 8,2%</div>
+            <div class="side-card-meta">Tháng 2, 2025 · 9 phút đọc</div>
+          </div>
+        </div>
+        <div class="featured-side-card" onclick="showPage('article')">
+          <div class="side-card-thumb">
+            <svg width="24" height="24" fill="none" stroke="#D6D3D1" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          </div>
+          <div class="side-card-body">
+            <div class="side-card-cat">Nhà Ở</div>
+            <div class="side-card-title">Thiếu Hụt Nguồn Cung Căn Hộ Đẩy Giá Leo Thang Tại Các Thành Phố Hạng Nhất</div>
+            <div class="side-card-meta">Tháng 1, 2025 · 11 phút đọc</div>
+          </div>
+        </div>
+        <div class="featured-side-card" onclick="showPage('article')">
+          <div class="side-card-thumb">
+            <svg width="24" height="24" fill="none" stroke="#D6D3D1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <div class="side-card-body">
+            <div class="side-card-cat">Công Nghiệp</div>
+            <div class="side-card-title">Giá Đất Khu Công Nghiệp Phía Bắc — Khảo Sát Chuẩn Q4 2024</div>
+            <div class="side-card-meta">Tháng 12, 2024 · 7 phút đọc</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" style="margin: 2rem -2rem; padding: 0 2rem;">
+      <div class="stats-bar-inner">
+        <div class="stat-item">
+          <div class="stat-value">124<span>+</span></div>
+          <div class="stat-label">Báo Cáo Nghiên Cứu</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">₫2,4<span>N</span></div>
+          <div class="stat-label">Giá Trị Đấu Giá Theo Dõi</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">18<span>+</span></div>
+          <div class="stat-label">Phân Khúc Thị Trường</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">2019<span>—</span></div>
+          <div class="stat-label">Năm Thành Lập</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Latest Articles -->
+    <div class="section-label" style="margin-top:3rem;">
+      <span class="section-label-text">Nghiên Cứu Mới Nhất</span>
+      <div class="section-label-line"></div>
+      <button style="font-family:var(--f-body);font-size:.65rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;background:none;border:1px solid var(--c-border);padding:6px 14px;cursor:pointer;color:var(--c-muted-fg);transition:all .2s;white-space:nowrap;" onclick="showPage('articles')">Xem Tất Cả</button>
+    </div>
+
+    <div class="article-grid">
+      <!-- Card 1 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8ECF0,#D6D3D1);">
+          <svg width="40" height="40" fill="none" stroke="#B8B0A8" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category">Nhà Ở</span>
+          <div class="card-title">Phân Khúc Căn Hộ Cao Cấp Quận 1 — Phân Tích Cung Cầu 2025</div>
+          <div class="card-excerpt">Các dự án hạng sang tiếp tục vượt kỳ vọng thị trường khi điều chỉnh hạn ngạch sở hữu nước ngoài thu hút dòng vốn tổ chức vào phân khúc cao cấp Quận 1.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Nguyễn Văn An</span>
+              <span class="card-meta-dot"></span>
+              <span>10 thg 3, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>2.4k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8E0D0,#D4C9B0);">
+          <svg width="40" height="40" fill="none" stroke="#B8AC94" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category">Thương Mại</span>
+          <div class="card-title">Co-Working & Văn Phòng Linh Hoạt — Động Lực Thâm Nhập Thị Trường Việt Nam</div>
+          <div class="card-excerpt">Khi các nhà khai thác toàn cầu đẩy nhanh mở rộng tại Việt Nam, chủ nhà nội địa điều chỉnh cấu trúc hợp đồng để đáp ứng nhu cầu không gian làm việc linh hoạt.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Lê Thị Hoa</span>
+              <span class="card-meta-dot"></span>
+              <span>5 thg 3, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>1.8k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 3 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E0E8E0,#C8D8C8);">
+          <svg width="40" height="40" fill="none" stroke="#A8C0A8" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category">Công Nghiệp</span>
+          <div class="card-title">Hấp Thụ KCN Dẫn Dắt Bởi FDI — Nghiên Cứu Hành Lang Bình Dương & Long An</div>
+          <div class="card-excerpt">Chuyển dịch sản xuất từ Trung Quốc tiếp tục hỗ trợ tăng giá đất công nghiệp, với tỷ lệ thuê nhà xưởng xây sẵn trước đạt mức cao kỷ lục tại Bình Dương.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Phạm Đức Mạnh</span>
+              <span class="card-meta-dot"></span>
+              <span>28 thg 2, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>3.1k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 4 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8E0E8,#D0C8D8);">
+          <svg width="40" height="40" fill="none" stroke="#B0A8C0" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category" style="color:#7C3AED;background:#EDE9FE;border-color:rgba(124,58,237,.2);">Pháp Lý</span>
+          <div class="card-title">Sửa Đổi Luật Đất Đai 2024 — Đánh Giá Tác Động Cho Nhà Đấu Giá</div>
+          <div class="card-excerpt">Rà soát toàn diện các sửa đổi Điều 218–231 ảnh hưởng đến quy trình đấu giá bắt buộc và quyền lợi của nhà đầu tư liên doanh theo pháp luật Việt Nam.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Hoàng Thị Mai</span>
+              <span class="card-meta-dot"></span>
+              <span>20 thg 2, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>4.7k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 5 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E0E4E8,#C8D0D8);">
+          <svg width="40" height="40" fill="none" stroke="#A0B0C0" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category" style="color:#0369A1;background:#E0F2FE;border-color:rgba(3,105,161,.2);">Dữ Liệu Thị Trường</span>
+          <div class="card-title">Phân Tích Tỷ Lệ Thanh Lý Đấu Giá Q4 2024 — Báo Cáo Tóm Tắt Toàn Quốc</div>
+          <div class="card-excerpt">Dữ liệu tổng hợp từ 847 phiên đấu giá tại 32 tỉnh thành cho thấy tỷ lệ thanh lý phục hồi lên 71,4% khi niềm tin thị trường trở lại sau khi khung pháp lý được làm rõ.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Nhóm Nghiên Cứu</span>
+              <span class="card-meta-dot"></span>
+              <span>15 thg 2, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>5.2k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Card 6 -->
+      <div class="article-card" onclick="showPage('article')">
+        <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#F0E8E0,#E0D0C0);">
+          <svg width="40" height="40" fill="none" stroke="#C8B09A" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        </div>
+        <div class="card-body">
+          <span class="card-category">Đất Đai</span>
+          <div class="card-title">Phương Pháp Định Giá Đất Ven Biển — Nghiên Cứu So Sánh Từ Đà Nẵng Đến Phú Quốc</div>
+          <div class="card-excerpt">Chuẩn hóa phương pháp thẩm định đất nghỉ dưỡng ven biển đối mặt với thách thức thu hồi bắt buộc, tập trung vào điều chỉnh vị trí cao cấp.</div>
+          <div class="card-meta">
+            <div class="card-meta-left">
+              <span>Võ Thành Tùng</span>
+              <span class="card-meta-dot"></span>
+              <span>8 thg 2, 2025</span>
+            </div>
+            <div class="card-view-count">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>1.9k</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div>
+          <div class="footer-logo">ĐẤUGIÁ<span>.</span></div>
+          <div class="footer-desc">Nguồn thông tin nghiên cứu thị trường đấu giá bất động sản uy tín tại Việt Nam. Nghiên cứu liên doanh dành cho nhà đầu tư tổ chức và chuyên gia đấu giá.</div>
+        </div>
+        <div>
+          <div class="footer-col-title">Nghiên Cứu</div>
+          <ul class="footer-links">
+            <li><a>Nhà Ở</a></li>
+            <li><a>Thương Mại</a></li>
+            <li><a>Công Nghiệp</a></li>
+            <li><a>Đất Đai</a></li>
+            <li><a>Báo Cáo Đấu Giá</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-col-title">Công Ty</div>
+          <ul class="footer-links">
+            <li><a>Giới Thiệu</a></li>
+            <li><a>Đội Ngũ Phân Tích</a></li>
+            <li><a>Phương Pháp</a></li>
+            <li><a>Đối Tác</a></li>
+            <li><a>Liên Hệ</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-col-title">Pháp Lý</div>
+          <ul class="footer-links">
+            <li><a>Chính Sách Bảo Mật</a></li>
+            <li><a>Điều Khoản Sử Dụng</a></li>
+            <li><a>Tuyên Bố Miễn Trừ</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 Đấugiá Research. Bảo lưu mọi quyền.</span>
+        <span>TP. Hồ Chí Minh · Hà Nội · Đà Nẵng</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════ ARTICLES LIST PAGE -->
+<div class="page" id="page-articles">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div>
+        <h2>Thư Viện Nghiên Cứu</h2>
+        <p>Thông tin thị trường toàn diện trên tất cả các phân khúc bất động sản</p>
+      </div>
+      <div class="breadcrumb"><a onclick="showPage('home')">Trang Chủ</a> <span>/</span> Nghiên Cứu</div>
+    </div>
+  </div>
+
+  <div class="articles-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="search-bar-wrap">
+          <div class="search-bar-icon">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </div>
+          <input class="search-bar" placeholder="Tìm kiếm báo cáo…" type="text">
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Danh Mục</div>
+        <div class="sidebar-item active">Tất Cả <span class="sidebar-count">124</span></div>
+        <div class="sidebar-item">Nhà Ở <span class="sidebar-count">38</span></div>
+        <div class="sidebar-item">Thương Mại <span class="sidebar-count">29</span></div>
+        <div class="sidebar-item">Công Nghiệp <span class="sidebar-count">22</span></div>
+        <div class="sidebar-item">Đất Đai <span class="sidebar-count">15</span></div>
+        <div class="sidebar-item">Báo Cáo Đấu Giá <span class="sidebar-count">12</span></div>
+        <div class="sidebar-item">Dữ Liệu Thị Trường <span class="sidebar-count">8</span></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Năm</div>
+        <div class="sidebar-item">2025 <span class="sidebar-count">24</span></div>
+        <div class="sidebar-item">2024 <span class="sidebar-count">61</span></div>
+        <div class="sidebar-item">2023 <span class="sidebar-count">39</span></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Từ Khóa Phổ Biến</div>
+        <div class="tag-cloud" style="margin-top:.5rem;">
+          <span class="tag-pill">TP.HCM</span>
+          <span class="tag-pill">Hà Nội</span>
+          <span class="tag-pill">FDI</span>
+          <span class="tag-pill">Đấu Giá</span>
+          <span class="tag-pill">Luật Đất Đai</span>
+          <span class="tag-pill">Công Nghiệp</span>
+          <span class="tag-pill">Q1 2025</span>
+          <span class="tag-pill">Hạng A</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="articles-main">
+      <div class="articles-header">
+        <div class="articles-count">Hiển thị <strong>124</strong> báo cáo</div>
+        <select class="sort-select">
+          <option>Mới Nhất</option>
+          <option>Xem Nhiều Nhất</option>
+          <option>Cũ Nhất</option>
+        </select>
+      </div>
+      <div class="list-article-grid">
+        <div class="article-card" onclick="showPage('article')">
+          <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8ECF0,#D6D3D1);">
+            <svg width="32" height="32" fill="none" stroke="#B8B0A8" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          </div>
+          <div class="card-body">
+            <span class="card-category">Báo Cáo Đấu Giá</span>
+            <div class="card-title">Thị Trường Đấu Giá Bất Động Sản Việt Nam — Triển Vọng Giữa Năm 2025</div>
+            <div class="card-excerpt">Tỷ lệ thanh lý phục hồi, khung pháp lý rõ ràng và sự tham gia của tổ chức định hình lại thị trường đấu giá bắt buộc tại Việt Nam.</div>
+            <div class="card-meta">
+              <div class="card-meta-left"><span>Trần Thị Lan</span><span class="card-meta-dot"></span><span>15 thg 3, 2025</span></div>
+              <div class="card-view-count"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>5.2k</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="article-card" onclick="showPage('article')">
+          <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8E0D0,#D4C9B0);">
+            <svg width="32" height="32" fill="none" stroke="#B8AC94" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="card-body">
+            <span class="card-category">Thương Mại</span>
+            <div class="card-title">Văn Phòng CBD Hà Nội Phục Hồi — Tỷ Lệ Trống Hạng A Giảm Xuống 8,2%</div>
+            <div class="card-excerpt">Nhu cầu phục hồi từ tài chính và công nghệ đưa tỷ lệ trống hạng A về mức thấp nhất nhiều năm.</div>
+            <div class="card-meta">
+              <div class="card-meta-left"><span>Lê Thị Hoa</span><span class="card-meta-dot"></span><span>5 thg 3, 2025</span></div>
+              <div class="card-view-count"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>1.8k</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="article-card" onclick="showPage('article')">
+          <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E0E8E0,#C8D8C8);">
+            <svg width="32" height="32" fill="none" stroke="#A8C0A8" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/></svg>
+          </div>
+          <div class="card-body">
+            <span class="card-category">Công Nghiệp</span>
+            <div class="card-title">Hấp Thụ KCN Dẫn Dắt Bởi FDI — Hành Lang Bình Dương & Long An</div>
+            <div class="card-excerpt">Chuyển dịch sản xuất từ Trung Quốc tiếp tục hỗ trợ tăng giá đất công nghiệp với tỷ lệ thuê trước kỷ lục.</div>
+            <div class="card-meta">
+              <div class="card-meta-left"><span>Phạm Đức Mạnh</span><span class="card-meta-dot"></span><span>28 thg 2, 2025</span></div>
+              <div class="card-view-count"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>3.1k</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="article-card" onclick="showPage('article')">
+          <div class="card-thumb card-thumb-placeholder" style="background:linear-gradient(135deg,#E8E0E8,#D0C8D8);">
+            <svg width="32" height="32" fill="none" stroke="#B0A8C0" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="card-body">
+            <span class="card-category" style="color:#7C3AED;background:#EDE9FE;border-color:rgba(124,58,237,.2);">Pháp Lý</span>
+            <div class="card-title">Sửa Đổi Luật Đất Đai 2024 — Đánh Giá Tác Động Cho Nhà Đấu Giá</div>
+            <div class="card-excerpt">Rà soát toàn diện Điều 218–231 ảnh hưởng đến quy trình đấu giá bắt buộc của nhà đầu tư liên doanh.</div>
+            <div class="card-meta">
+              <div class="card-meta-left"><span>Hoàng Thị Mai</span><span class="card-meta-dot"></span><span>20 thg 2, 2025</span></div>
+              <div class="card-view-count"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>4.7k</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pagination">
+        <button class="page-btn active">1</button>
+        <button class="page-btn">2</button>
+        <button class="page-btn">3</button>
+        <button class="page-btn">…</button>
+        <button class="page-btn">12</button>
+        <button class="page-btn" style="width:auto;padding:0 12px;">Tiếp →</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════ ARTICLE DETAIL PAGE -->
+<div class="page" id="page-article">
+  <div class="article-detail-wrap">
+    <!-- TOC -->
+    <nav class="article-toc">
+      <div class="toc-title">Mục Lục</div>
+      <ul class="toc-list">
+        <li class="toc-item active">Tóm Tắt</li>
+        <li class="toc-item">Tổng Quan Thị Trường</li>
+        <li class="toc-item sub">TP.HCM</li>
+        <li class="toc-item sub">Hà Nội</li>
+        <li class="toc-item sub">Đà Nẵng</li>
+        <li class="toc-item">Khối Lượng Đấu Giá</li>
+        <li class="toc-item">Cập Nhật Pháp Lý</li>
+        <li class="toc-item">Xu Hướng Giá</li>
+        <li class="toc-item">Triển Vọng Nhà Đầu Tư</li>
+        <li class="toc-item">Phương Pháp Nghiên Cứu</li>
+      </ul>
+    </nav>
+
+    <!-- Content -->
+    <article class="article-content">
+      <div class="article-breadcrumb">
+        <a onclick="showPage('home')">Trang Chủ</a>
+        <span>/</span>
+        <a onclick="showPage('articles')">Nghiên Cứu</a>
+        <span>/</span>
+        Báo Cáo Đấu Giá
+      </div>
+      <span class="article-category-badge">Báo Cáo Đấu Giá · Q1 2025</span>
+      <h1 class="article-title">Thị Trường Đấu Giá Bất Động Sản Việt Nam — Triển Vọng Giữa Năm 2025</h1>
+      <div class="article-meta-row">
+        <span>Trần Thị Lan</span>
+        <span class="article-meta-dot"></span>
+        <span>Chuyên Viên Phân Tích Cao Cấp, Đấugiá Research</span>
+        <span class="article-meta-dot"></span>
+        <span>15 tháng 3, 2025</span>
+        <span class="article-meta-dot"></span>
+        <span>18 phút đọc</span>
+        <span class="article-meta-dot"></span>
+        <span style="display:flex;align-items:center;gap:.3rem;">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          5.241 lượt xem
+        </span>
+      </div>
+
+      <div class="article-hero-img">
+        <div style="display:flex;align-items:center;justify-content:center;gap:2rem;opacity:.3;">
+          <svg width="64" height="64" fill="none" stroke="#1C1917" stroke-width="1" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <svg width="48" height="48" fill="none" stroke="#A16207" stroke-width="1" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <svg width="64" height="64" fill="none" stroke="#1C1917" stroke-width="1" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div class="article-hero-img-overlay"></div>
+      </div>
+
+      <div class="article-body">
+        <h2>Tóm Tắt</h2>
+        <p>Thị trường đấu giá bất động sản bắt buộc tại Việt Nam đã ghi nhận mức phục hồi đáng kể trong Q1 2025, với tỷ lệ thanh lý trên toàn quốc tăng lên 71,4% — mức cao nhất kể từ Q3 2021. Báo cáo này tổng hợp dữ liệu từ 847 giao dịch được ghi nhận tại 32 tỉnh thành, cung cấp các chỉ số chuẩn cho nhà đầu tư tổ chức, đối tác liên doanh và chuyên gia pháp lý trong lĩnh vực này.</p>
+
+        <blockquote>«Sự hội tụ của việc làm rõ khung pháp lý theo các sửa đổi Luật Đất Đai 2024 và sự quan tâm trở lại của các tổ chức đầu tư đã tạo ra môi trường đấu giá thuận lợi nhất mà Việt Nam chứng kiến trong thập kỷ này.»</blockquote>
+
+        <h2>Tổng Quan Thị Trường</h2>
+        <p>Tổng giá trị đấu giá trong quý đạt ₫18,4 nghìn tỷ, tăng 24,3% so với cùng kỳ năm trước. TP. Hồ Chí Minh chiếm 38% tổng giá trị giao dịch, tiếp theo là Hà Nội với 29% và Đà Nẵng 11%. 22% còn lại phân bổ tại các thị trường tỉnh thành, đặc biệt sôi động tại Bình Dương, Đồng Nai và Khánh Hòa.</p>
+
+        <div class="data-highlight">
+          <div class="data-highlight-item">
+            <span class="number">71,4<span style="font-size:1rem;">%</span></span>
+            <span class="label">Tỷ Lệ Thanh Lý</span>
+          </div>
+          <div class="data-highlight-item">
+            <span class="number">₫18,4<span style="font-size:1rem;">N</span></span>
+            <span class="label">Tổng Giá Trị Đấu Giá</span>
+          </div>
+          <div class="data-highlight-item">
+            <span class="number">847</span>
+            <span class="label">Giao Dịch Ghi Nhận</span>
+          </div>
+        </div>
+
+        <h3>TP. Hồ Chí Minh</h3>
+        <p>Đô thị phía Nam dẫn đầu với 322 phiên đấu giá tổng trị giá ₫7,0 nghìn tỷ. Các lô đất nhà ở tại Bình Chánh và TP. Thủ Đức thu hút đấu thầu cạnh tranh, với mức chênh lệch trung bình so với giá khởi điểm đạt 18,7% — cho thấy nhu cầu nền tảng mạnh mẽ hoàn toàn tách biệt với sự trầm lắng của thị trường thứ cấp.</p>
+
+        <h3>Hà Nội</h3>
+        <p>Các phiên đấu giá tập trung tại Hoài Đức, Đông Anh và Mê Linh, phản ánh chiến lược thu mua đất của nhà phát triển trước khi các tuyến metro hoàn thành. Tỷ lệ giá trúng/giá khởi điểm trung bình cải thiện lên 1,21 lần từ mức 1,09 lần trong Q4 2024.</p>
+
+        <h2>Cập Nhật Pháp Lý</h2>
+        <p>Luật Đất Đai sửa đổi 2024, có hiệu lực từ tháng 1 năm 2025, đã đưa ra quy trình phê duyệt đơn giản hơn cho đăng ký đấu giá bắt buộc và làm rõ quyền của các thực thể liên doanh có vốn nước ngoài được trực tiếp tham gia đấu giá đất nhà nước. Những thay đổi này đã rút ngắn đáng kể thời gian giao dịch và góp phần vào sự phục hồi tỷ lệ thanh lý trong quý này.</p>
+      </div>
+
+      <div class="article-author-block">
+        <div class="author-avatar">TL</div>
+        <div class="author-info">
+          <div class="name">Trần Thị Lan</div>
+          <div class="role">Chuyên Viên Phân Tích Cao Cấp · Thị Trường Đấu Giá, Đấugiá Research</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.75rem;margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--c-border);">
+        <div class="tag-cloud">
+          <span class="tag-pill">Đấu Giá</span>
+          <span class="tag-pill">Q1 2025</span>
+          <span class="tag-pill">TP.HCM</span>
+          <span class="tag-pill">Luật Đất Đai</span>
+          <span class="tag-pill">Tỷ Lệ Thanh Lý</span>
+        </div>
+      </div>
+
+      <!-- DOWNLOAD BUTTON -->
+      <div style="margin-top:2.5rem;padding:2rem;background:var(--c-warm-white);border:1px solid var(--c-border);display:flex;align-items:center;justify-content:space-between;gap:1.5rem;">
+        <div>
+          <div style="font-family:var(--f-heading);font-size:1rem;font-weight:600;color:var(--c-charcoal);margin-bottom:.3rem;">Tải Xuống Tài Liệu Gốc</div>
+          <div style="font-size:.78rem;color:var(--c-muted-fg);letter-spacing:.03em;">Báo cáo đầy đủ định dạng PDF · 2,4 MB · 47 trang</div>
+        </div>
+        <button style="font-family:var(--f-body);font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;background:var(--c-charcoal);color:var(--c-warm-white);border:none;padding:14px 28px;cursor:pointer;display:flex;align-items:center;gap:.6rem;transition:all .25s;flex-shrink:0;" onmouseover="this.style.background='var(--c-gold)'" onmouseout="this.style.background='var(--c-charcoal)'">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Tải Xuống PDF
+        </button>
+      </div>
+    </article>
+
+    <!-- Right Sidebar -->
+    <aside class="article-sidebar">
+      <div class="article-sidebar-widget">
+        <div class="widget-title">Nghiên Cứu Liên Quan</div>
+        <div class="related-article" onclick="showPage('article')">
+          <div class="related-cat">Báo Cáo Đấu Giá</div>
+          <div class="related-title">Phân Tích Tỷ Lệ Thanh Lý Q4 2024 — Tóm Tắt Toàn Quốc</div>
+          <div class="related-date">15 thg 2, 2025</div>
+        </div>
+        <div class="related-article" onclick="showPage('article')">
+          <div class="related-cat">Pháp Lý</div>
+          <div class="related-title">Sửa Đổi Luật Đất Đai 2024 — Đánh Giá Tác Động</div>
+          <div class="related-date">20 thg 2, 2025</div>
+        </div>
+        <div class="related-article" onclick="showPage('article')">
+          <div class="related-cat">Nhà Ở</div>
+          <div class="related-title">Căn Hộ Cao Cấp — Phân Tích Cung Cầu Quận 1</div>
+          <div class="related-date">10 thg 3, 2025</div>
+        </div>
+      </div>
+      <div class="article-sidebar-widget">
+        <div class="widget-title">Danh Mục</div>
+        <div class="tag-cloud">
+          <span class="tag-pill" onclick="showPage('articles')">Nhà Ở</span>
+          <span class="tag-pill" onclick="showPage('articles')">Thương Mại</span>
+          <span class="tag-pill" onclick="showPage('articles')">Công Nghiệp</span>
+          <span class="tag-pill" onclick="showPage('articles')">Đấu Giá</span>
+          <span class="tag-pill" onclick="showPage('articles')">Đất Đai</span>
+          <span class="tag-pill" onclick="showPage('articles')">Pháp Lý</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ ADMIN DASHBOARD -->
+<div class="page" id="page-admin">
+  <div class="admin-layout">
+
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-logo">ĐẤUGIÁ<span>.</span> Quản Trị</div>
+      <div class="admin-nav-section">
+        <div class="admin-nav-label">Nội Dung</div>
+        <div class="admin-nav-item active">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Tổng Quan
+        </div>
+        <div class="admin-nav-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Bài Viết
+          <span class="admin-nav-badge">5</span>
+        </div>
+        <div class="admin-nav-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+          Danh Mục
+        </div>
+        <div class="admin-nav-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Từ Khóa
+        </div>
+      </div>
+      <div class="admin-nav-section">
+        <div class="admin-nav-label">Thống Kê</div>
+        <div class="admin-nav-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Phân Tích
+        </div>
+      </div>
+      <div class="admin-nav-section" style="margin-top:auto;">
+        <div class="admin-nav-item" onclick="showPage('home')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Xem Trang Web
+        </div>
+        <div class="admin-nav-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Đăng Xuất
+        </div>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="admin-content">
+      <div class="admin-header">
+        <div>
+          <div class="admin-title">Tổng Quan</div>
+          <div class="admin-subtitle">Chào mừng trở lại. Đây là những gì đang diễn ra trên cổng nghiên cứu của bạn.</div>
+        </div>
+        <button class="btn-upload">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Tải Lên Bài Viết
+        </button>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-label">Tổng Bài Viết</div>
+          <div class="stat-card-value">124</div>
+          <div class="stat-card-change">↑ 8 trong tháng này</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Đã Xuất Bản</div>
+          <div class="stat-card-value">119</div>
+          <div class="stat-card-change">↑ 96%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Tổng Lượt Xem</div>
+          <div class="stat-card-value">48,2k</div>
+          <div class="stat-card-change">↑ 12,4% so tháng trước</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Nháp Chờ Duyệt</div>
+          <div class="stat-card-value">5</div>
+          <div class="stat-card-change down">Cần xem xét</div>
+        </div>
+      </div>
+
+      <!-- Main Grid -->
+      <div class="admin-grid">
+        <!-- Table -->
+        <div class="admin-table-wrap">
+          <div class="admin-table-header">
+            <div class="admin-table-title">Bài Viết Gần Đây</div>
+            <input class="admin-table-search" placeholder="Tìm kiếm bài viết…" type="text">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tiêu Đề</th>
+                <th>Danh Mục</th>
+                <th>Trạng Thái</th>
+                <th>Lượt Xem</th>
+                <th>Ngày</th>
+                <th>Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="max-width:200px;">
+                  <div style="font-family:var(--f-heading);font-size:.78rem;font-weight:600;color:var(--c-charcoal);line-height:1.3;cursor:pointer;" onclick="showPage('article')">Thị Trường Đấu Giá VN Triển Vọng Q1 2025</div>
+                </td>
+                <td><span style="font-size:.7rem;color:var(--c-gold);">Báo Cáo Đấu Giá</span></td>
+                <td><span class="status-badge published">Đã Xuất Bản</span></td>
+                <td style="font-size:.8rem;color:var(--c-muted-fg);">5.241</td>
+                <td style="font-size:.75rem;color:var(--c-muted-fg);white-space:nowrap;">15 thg 3, 2025</td>
+                <td><div class="table-actions"><button class="table-btn">Sửa</button><button class="table-btn danger">Xóa</button></div></td>
+              </tr>
+              <tr>
+                <td style="max-width:200px;"><div style="font-family:var(--f-heading);font-size:.78rem;font-weight:600;color:var(--c-charcoal);line-height:1.3;">Văn Phòng CBD Hà Nội — Báo Cáo Tỷ Lệ Trống Hạng A</div></td>
+                <td><span style="font-size:.7rem;color:var(--c-gold);">Thương Mại</span></td>
+                <td><span class="status-badge published">Đã Xuất Bản</span></td>
+                <td style="font-size:.8rem;color:var(--c-muted-fg);">1.843</td>
+                <td style="font-size:.75rem;color:var(--c-muted-fg);white-space:nowrap;">5 thg 3, 2025</td>
+                <td><div class="table-actions"><button class="table-btn">Sửa</button><button class="table-btn danger">Xóa</button></div></td>
+              </tr>
+              <tr>
+                <td style="max-width:200px;"><div style="font-family:var(--f-heading);font-size:.78rem;font-weight:600;color:var(--c-charcoal);line-height:1.3;">Luật Đất Đai 2024 — Đánh Giá Tác Động Đấu Giá</div></td>
+                <td><span style="font-size:.7rem;color:#7C3AED;">Pháp Lý</span></td>
+                <td><span class="status-badge draft">Bản Nháp</span></td>
+                <td style="font-size:.8rem;color:var(--c-muted-fg);">—</td>
+                <td style="font-size:.75rem;color:var(--c-muted-fg);white-space:nowrap;">3 thg 3, 2025</td>
+                <td><div class="table-actions"><button class="table-btn">Sửa</button><button class="table-btn">Xuất Bản</button></div></td>
+              </tr>
+              <tr>
+                <td style="max-width:200px;"><div style="font-family:var(--f-heading);font-size:.78rem;font-weight:600;color:var(--c-charcoal);line-height:1.3;">KCN FDI — Hành Lang Bình Dương</div></td>
+                <td><span style="font-size:.7rem;color:var(--c-gold);">Công Nghiệp</span></td>
+                <td><span class="status-badge published">Đã Xuất Bản</span></td>
+                <td style="font-size:.8rem;color:var(--c-muted-fg);">3.104</td>
+                <td style="font-size:.75rem;color:var(--c-muted-fg);white-space:nowrap;">28 thg 2, 2025</td>
+                <td><div class="table-actions"><button class="table-btn">Sửa</button><button class="table-btn danger">Xóa</button></div></td>
+              </tr>
+              <tr>
+                <td style="max-width:200px;"><div style="font-family:var(--f-heading);font-size:.78rem;font-weight:600;color:var(--c-charcoal);line-height:1.3;">Định Giá Đất Ven Biển — Đà Nẵng Đến Phú Quốc</div></td>
+                <td><span style="font-size:.7rem;color:var(--c-gold);">Đất Đai</span></td>
+                <td><span class="status-badge archived">Lưu Trữ</span></td>
+                <td style="font-size:.8rem;color:var(--c-muted-fg);">1.924</td>
+                <td style="font-size:.75rem;color:var(--c-muted-fg);white-space:nowrap;">8 thg 2, 2025</td>
+                <td><div class="table-actions"><button class="table-btn">Khôi Phục</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Upload Widget -->
+        <div class="upload-widget">
+          <div class="upload-widget-header">Tải Lên Bài Viết Mới</div>
+          <div class="upload-widget-body">
+            <div class="drop-zone">
+              <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div class="drop-zone-text">
+                Kéo thả tệp vào đây, hoặc <strong>chọn tệp</strong>
+                <div class="drop-zone-types">PDF · DOCX · DOC · Tối đa 50MB</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tiêu Đề Bài Viết *</label>
+              <input class="form-input" type="text" placeholder="Nhập tiêu đề bài viết…">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tên Tác Giả *</label>
+              <input class="form-input" type="text" placeholder="VD: Nguyễn Văn An">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Danh Mục *</label>
+              <select class="form-select">
+                <option>Chọn danh mục…</option>
+                <option>Nhà Ở</option>
+                <option>Thương Mại</option>
+                <option>Công Nghiệp</option>
+                <option>Đất Đai</option>
+                <option>Báo Cáo Đấu Giá</option>
+                <option>Dữ Liệu Thị Trường</option>
+                <option>Pháp Lý</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mô Tả</label>
+              <textarea class="form-textarea" placeholder="Mô tả ngắn hoặc đoạn trích…"></textarea>
+            </div>
+            <button class="btn-submit">Tải Lên &amp; Lưu Nháp</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active-link'));
+
+  const target = document.getElementById('page-' + name);
+  if (target) {
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  if (name === 'home') document.getElementById('nav-home')?.classList.add('active-link');
+  if (name === 'articles') document.getElementById('nav-articles')?.classList.add('active-link');
+
+  // Filter pills interactivity
+  document.querySelectorAll('.filter-pill').forEach(pill => {
+    pill.addEventListener('click', function() {
+      this.closest('.filter-inner').querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+}
+
+// Filter pills
+document.querySelectorAll('.filter-pill').forEach(pill => {
+  pill.addEventListener('click', function() {
+    this.closest('.filter-inner').querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// Sidebar items
+document.querySelectorAll('.sidebar-item').forEach(item => {
+  item.addEventListener('click', function() {
+    this.closest('.sidebar-section').querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// TOC items
+document.querySelectorAll('.toc-item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.toc-item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

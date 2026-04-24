@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS view_events;
+DROP TABLE IF EXISTS article_tags;
+DROP TABLE IF EXISTS tags;
+DROP TABLE IF EXISTS article_attachments;
+DROP TABLE IF EXISTS article_images;
+DROP TABLE IF EXISTS articles;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS categories;

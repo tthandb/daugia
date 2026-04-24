@@ -1,0 +1,31 @@
+# Dependencies
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Backend
+backend/bin/
+backend/tmp/
+
+# Env files
+.env
+.env.local
+.env.production
+backend/.env
+
+# K8s secrets (never commit real secrets)
+k8s/secrets.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Legacy data (large files)
+*.backup
+*.backup.gz
+*.zip
+lxgnfmrwkbrzajkqwkpt/
