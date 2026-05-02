@@ -37,9 +37,10 @@
 | File Storage | MinIO — minio-go SDK |
 | Doc Parsing | mammoth CLI + pdftotext (poppler-utils) via os/exec |
 | Image | bimg (libvips) — thumbnail → 800×450 webp |
-| Backend Infra | **Kubernetes (k3s on Oracle Cloud Free Tier)** |
+| Backend Infra | **HyperCore NVMe VPS HYPER-2** (HCM 2, Vietnam) — Docker Compose, single VM |
+| Object Storage | **Cloudflare R2** (S3-compatible, 10 GB free, $0 egress) |
 | Frontend Hosting | **Vercel** (free, SSR/SSG, edge network) |
-| Ingress | nginx-ingress + cert-manager (Let's Encrypt) |
+| Ingress | Caddy 2 — TLS auto via Let's Encrypt |
 
 ---
 
@@ -168,13 +169,25 @@ Upload (multipart/form-data, max 50MB) → Go validates MIME + metadata → temp
 - Vercel Analytics enabled (free) for page views, Web Vitals, referrers
 - SEO: meta tags, Open Graph, JSON-LD `Article` schema, dynamic sitemap.xml
 
-### Backend: Oracle Cloud Free Tier + k3s
-- 2 ARM VMs (4 cores, 24GB RAM total) — free forever
-- k3s (lightweight K8s) + cert-manager + nginx-ingress
-- Pods: Go API (Deployment), PostgreSQL (StatefulSet, 20Gi PVC), MinIO (StatefulSet, 50Gi PVC)
-- `api.yourdomain.com` → nginx-ingress → Go API
-- CORS allows Vercel origin
-- `GET /api/health` — readiness probe
+### Backend: HyperCore NVMe VPS HYPER-2 (Ho Chi Minh 2) — single-VM Docker Compose
+- **Decided 2026-04-26**, replacing the original Oracle Cloud Free Tier + k3s plan (Oracle signup blocked).
+- Provider: [HyperCore](https://my.hypercore.vn) (built on Onidel Cloud), Vietnamese billing in VND.
+- Plan: **NVMe VPS HYPER-2** — 2 vCPU / 4 GB / 40 GB local NVMe / 200 Mbps unlimited.
+- Datacenter: Ho Chi Minh 2 (only DC available on the NVMe VPS family).
+- Annual prepay: **1,836,000đ (~$73/yr, ~$6.10/mo)** at -15%.
+- Stack on the VM (`deploy/hypercore/docker-compose.yml`): **Postgres 16** + **Go API** + **Caddy 2** (TLS auto via Let's Encrypt). No MinIO container.
+- **Object storage: Cloudflare R2** (10 GB free, $0 egress, S3-compatible). HyperCore Object Storage was evaluated but is 1 TB minimum and currently has no region selectable on the order page, so it doesn't fit this scale.
+- Daily Postgres dump → R2 backup bucket via `deploy/hypercore/backup.sh` (cron 03:00 ICT, 30-day retention).
+- HyperCore snapshots enabled (free, daily, 7-day retain) as second backup layer.
+- `migrate` (golang-migrate v4.17.1) is bundled into the runtime image (`backend/Dockerfile`) so `docker compose exec api migrate ...` works.
+- All-in cost: **~2,150,000đ/yr (~$85/yr, ~$7.10/mo)** including domain.
+- Resize path: dashboard → HYPER-3 (4 vCPU / 8 GB / 80 GB, 360K/mo) in ~30s if peak RAM ever exceeds 4 GB.
+- Old k3s plan files in `k8s/` are kept for reference but are not the deployment target.
+- Domain: **daugiavinhyen.com** (registered at TenTen).
+  - `api.daugiavinhyen.com` → A record → HyperCore VPS IP → Caddy (TLS) → Go API → Postgres + R2.
+  - `daugiavinhyen.com` (apex) + `www` → Vercel for the public Next.js frontend.
+- CORS allows Vercel origin (`https://daugiavinhyen.com`).
+- `GET /api/health` — used by UptimeRobot (free tier, 5-min checks).
 
 ---
 

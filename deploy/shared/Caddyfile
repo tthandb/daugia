@@ -1,0 +1,22 @@
+# Single front door for every domain hosted on this VM.
+#
+# To add a site:
+#   1. Drop a file into ./conf.d/ — e.g. conf.d/blog.example.com.caddy
+#   2. docker compose -f deploy/shared/docker-compose.yml exec caddy caddy reload \
+#        --config /etc/caddy/Caddyfile
+#
+# Each per-site file should look like:
+#   blog.example.com {
+#     reverse_proxy <container-name-on-proxy-network>:<port>
+#   }
+#
+# Containers must join the `proxy` external network and `expose:` (not `ports:`)
+# the port Caddy will hit.
+
+{
+	email admin@daugiavinhyen.com
+	# Uncomment to test against staging Let's Encrypt before going live:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+import /etc/caddy/conf.d/*.caddy

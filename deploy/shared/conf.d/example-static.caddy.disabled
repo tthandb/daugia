@@ -1,0 +1,19 @@
+# Example: static site served by Caddy itself (no separate container).
+# Rename to `<your-domain>.caddy` to enable.
+
+# blog.example.com {
+# 	root * /srv/blog
+# 	file_server
+# 	encode zstd gzip
+# }
+
+# Example: SSR site running in its own container.
+#
+# myapp.example.com {
+# 	encode zstd gzip
+# 	reverse_proxy myapp:3000
+# }
+#
+# The `myapp` service must:
+#   - join the external `proxy` network
+#   - `expose: ["3000"]` (no host port mapping)

@@ -1,0 +1,11 @@
+api.daugiavinhyen.com {
+	encode zstd gzip
+	reverse_proxy daugia-api:8080
+
+	log {
+		output file /data/access-daugia.log {
+			roll_size 50mb
+			roll_keep 5
+		}
+	}
+}

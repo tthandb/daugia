@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: daugia-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: daugia-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Cloudflare R2 (S3-compatible)
+      MINIO_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT}
+      MINIO_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY}
+      MINIO_BUCKET: ${OBJECT_STORAGE_BUCKET}
+      MINIO_USE_SSL: "true"
+
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      SECURE_COOKIE: "true"
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    expose:
+      - "8080"
+    mem_limit: 1g
+    networks:
+      - internal
+      - proxy
+
+networks:
+  internal:
+  proxy:
+    name: proxy
+    external: true

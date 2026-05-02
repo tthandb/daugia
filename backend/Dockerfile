@@ -21,11 +21,15 @@ FROM alpine:3.19
 
 RUN apk add --no-cache \
     ca-certificates \
+    curl \
     nodejs npm \
     poppler-utils \
     vips \
     && npm install -g mammoth \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz \
+       | tar -xz -C /usr/local/bin migrate \
+    && chmod +x /usr/local/bin/migrate
 
 WORKDIR /app
 COPY --from=builder /app/bin/api .
