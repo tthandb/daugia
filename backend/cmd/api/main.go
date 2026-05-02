@@ -111,9 +111,12 @@ func main() {
 		// Search
 		r.Get("/search", h.SearchArticles)
 
-		// File proxies
+		// File proxies. HEAD shares the GET handler so monitoring tools and
+		// CDN preflights stop seeing 405.
 		r.Get("/thumbs/{id}", h.ProxyThumbnail)
+		r.Head("/thumbs/{id}", h.ProxyThumbnail)
 		r.Get("/images/{id}", h.ProxyImage)
+		r.Head("/images/{id}", h.ProxyImage)
 		r.Get("/articles/{id}/attachments/{attachmentId}", h.DownloadAttachment)
 		r.Get("/articles/{slug}/download", h.DownloadArticle)
 

@@ -75,7 +75,6 @@ export default async function HomePage() {
     <>
       {/* Hero Section */}
       <section className="relative bg-charcoal py-24 sm:py-32">
-        <div className="absolute inset-0 bg-[url('/grain.png')] opacity-5" />
         <div className="container-wide relative">
           <div className="mx-auto max-w-3xl text-center">
             <p className="font-body text-xs font-semibold uppercase tracking-[0.25em] text-gold sm:text-sm">
@@ -123,8 +122,12 @@ export default async function HomePage() {
             </div>
 
             <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {featured.map((article) => (
-                <ArticleCard key={article.id} article={article} />
+              {featured.map((article, idx) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  priority={idx === 0}
+                />
               ))}
             </div>
           </div>

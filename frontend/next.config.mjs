@@ -14,6 +14,14 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // next/image config — enable AVIF (Next will fall back to WebP / JPEG for
+  // browsers that don't accept it) and trim the device/image size lists so
+  // we don't emit 10 srcset variants for an 800×450 source thumbnail.
+  images: {
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [256, 384, 640],
+  },
   async rewrites() {
     return [
       {

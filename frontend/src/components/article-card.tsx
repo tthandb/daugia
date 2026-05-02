@@ -18,9 +18,15 @@ export interface ArticleCardProps {
     categoryColor: string | null;
   };
   className?: string;
+  /**
+   * Mark this card's image as the LCP candidate. Pass `true` for the first
+   * card in any above-the-fold grid so Next emits `fetchpriority="high"` and
+   * skips lazy-loading. Default `false` keeps every other card lazy.
+   */
+  priority?: boolean;
 }
 
-export function ArticleCard({ article, className }: ArticleCardProps) {
+export function ArticleCard({ article, className, priority = false }: ArticleCardProps) {
   return (
     <Link
       href={`/articles/${article.slug}`}
@@ -38,6 +44,7 @@ export function ArticleCard({ article, className }: ArticleCardProps) {
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={priority}
           />
         ) : (
           <div className="flex h-full items-center justify-center">

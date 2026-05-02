@@ -186,7 +186,6 @@ export default function AboutPage() {
 
       {/* Hero */}
       <section className="relative bg-charcoal py-20 sm:py-24">
-        <div className="absolute inset-0 bg-[url('/grain.png')] opacity-5" />
         <div className="container-narrow relative">
           <p className="font-body text-xs font-semibold uppercase tracking-[0.3em] text-gold sm:text-sm">
             Giới Thiệu

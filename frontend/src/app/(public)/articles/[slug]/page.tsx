@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Download, Eye, Calendar, User, FileText, Paperclip, MapPin, Clock, Wallet } from "lucide-react";
 import { publicFetch } from "@/lib/api";
@@ -469,13 +470,13 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                       key={img.id}
                       className="overflow-hidden rounded-lg border border-warm-border"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={img.url}
                         alt={img.altText || img.fileName}
+                        width={img.width || 800}
+                        height={img.height || 600}
+                        sizes="(max-width: 640px) 100vw, 50vw"
                         className="h-auto w-full object-cover"
-                        width={img.width}
-                        height={img.height}
                       />
                       {img.altText && (
                         <p className="px-3 py-2 font-body text-xs text-muted-fg">
