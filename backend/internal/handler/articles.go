@@ -237,6 +237,36 @@ func (h *Handler) GetArticle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 
+// DownloadArticle redirects the user to a presigned URL for the original
+// uploaded document. Public — only resolves PUBLISHED articles.
+func (h *Handler) DownloadArticle(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	slug := chi.URLParam(r, "slug")
+
+	article, err := h.queries.GetArticleBySlug(ctx, slug)
+	if err != nil {
+		writeError(w, 404, "article not found")
+		return
+	}
+	if article.OriginalFileKey == nil {
+		writeError(w, 404, "no original file")
+		return
+	}
+
+	downloadName := article.Slug
+	if article.OriginalFileName != nil {
+		downloadName = *article.OriginalFileName
+	}
+
+	url, err := h.store.PresignedDownloadURL(ctx, *article.OriginalFileKey, downloadName, 5*time.Minute)
+	if err != nil {
+		writeError(w, 500, "failed to generate download URL")
+		return
+	}
+
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
 func (h *Handler) SearchArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := r.URL.Query().Get("q")

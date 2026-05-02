@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"net/url"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -64,6 +66,33 @@ func (c *Client) PresignedURL(ctx context.Context, objectKey string, expiry time
 		return "", err
 	}
 	return u.String(), nil
+}
+
+// PresignedDownloadURL generates a presigned URL that forces the browser to
+// download the object as an attachment with the given filename.
+func (c *Client) PresignedDownloadURL(ctx context.Context, objectKey, downloadName string, expiry time.Duration) (string, error) {
+	reqParams := url.Values{}
+	if downloadName != "" {
+		reqParams.Set("response-content-disposition", fmt.Sprintf(`attachment; filename="%s"`, sanitizeFilename(downloadName)))
+	}
+	u, err := c.mc.PresignedGetObject(ctx, c.bucket, objectKey, expiry, reqParams)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
+// sanitizeFilename strips control characters and quotes to keep the
+// Content-Disposition header valid.
+func sanitizeFilename(name string) string {
+	out := make([]rune, 0, len(name))
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f || r == '"' || r == '\\' {
+			continue
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }
 
 // Delete removes a single object from the bucket.

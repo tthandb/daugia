@@ -115,6 +115,7 @@ func main() {
 		r.Get("/thumbs/{id}", h.ProxyThumbnail)
 		r.Get("/images/{id}", h.ProxyImage)
 		r.Get("/articles/{id}/attachments/{attachmentId}", h.DownloadAttachment)
+		r.Get("/articles/{slug}/download", h.DownloadArticle)
 
 		// Sitemap data
 		r.Get("/sitemap", h.SitemapData)

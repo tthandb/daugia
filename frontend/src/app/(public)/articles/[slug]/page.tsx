@@ -76,6 +76,23 @@ export async function generateMetadata({
 }
 
 /**
+ * Returns a short uppercase label (PDF, DOCX, …) derived from filename or MIME.
+ */
+function fileExtensionLabel(
+  fileName?: string | null,
+  mime?: string | null
+): string {
+  if (fileName) {
+    const m = fileName.match(/\.([a-z0-9]{2,5})$/i);
+    if (m) return m[1].toUpperCase();
+  }
+  if (mime?.includes("pdf")) return "PDF";
+  if (mime?.includes("wordprocessingml")) return "DOCX";
+  if (mime?.includes("msword")) return "DOC";
+  return "";
+}
+
+/**
  * Extract headings from HTML content for table of contents.
  */
 function extractHeadings(
@@ -355,24 +372,46 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
               </div>
             )}
 
-            {/* Download button */}
-            {attachments.length > 0 && (
-              <div className="mt-8">
-                <a
-                  href={attachments[0].url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-3 rounded-lg bg-charcoal px-6 py-3 font-body text-sm font-semibold text-white transition-colors hover:bg-gold"
-                >
-                  <Download className="h-5 w-5" />
-                  Tải Xuống PDF
-                  {attachments[0].sizeBytes > 0 && (
-                    <span className="text-xs font-normal opacity-70">
-                      ({formatFileSize(attachments[0].sizeBytes)})
-                    </span>
-                  )}
-                </a>
-              </div>
+            {/* Original document download */}
+            {article.originalFileName && (
+              <section className="mt-12 rounded-lg border border-warm-border bg-warm-white p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gold-pale">
+                      <FileText className="h-5 w-5 text-gold" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-heading text-sm font-semibold text-charcoal">
+                        Tài Liệu Gốc
+                      </p>
+                      <p
+                        className="truncate font-body text-xs text-muted-fg"
+                        title={article.originalFileName}
+                      >
+                        {article.originalFileName}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={`/api/articles/${article.slug}/download`}
+                    className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-md bg-charcoal px-5 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-gold"
+                  >
+                    <Download className="h-4 w-4" />
+                    Tải Xuống
+                    {fileExtensionLabel(
+                      article.originalFileName,
+                      article.originalFileMime
+                    ) && (
+                      <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                        {fileExtensionLabel(
+                          article.originalFileName,
+                          article.originalFileMime
+                        )}
+                      </span>
+                    )}
+                  </a>
+                </div>
+              </section>
             )}
           </div>
 

@@ -14,6 +14,8 @@ import {
   X,
   ImagePlus,
   Paperclip,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import {
   clientFetch,
@@ -333,22 +335,29 @@ export default function EditArticlePage() {
         </p>
       </div>
 
-      {/* Status messages */}
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 px-4 py-3 font-body text-sm text-red-600">
-          {error}
-          <button
-            type="button"
-            onClick={() => setError("")}
-            className="ml-2 font-medium underline"
-          >
-            Đóng
-          </button>
-        </div>
-      )}
-      {success && (
-        <div className="mb-4 rounded-md bg-green-50 px-4 py-3 font-body text-sm text-green-700">
-          {success}
+      {/* Floating toast */}
+      {(success || error) && (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+          {success && (
+            <div className="pointer-events-auto flex items-start gap-2 rounded-lg border border-green-200 bg-white px-4 py-3 font-body text-sm text-green-700 shadow-lg ring-1 ring-black/5 animate-dialog-in">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+              <span>{success}</span>
+            </div>
+          )}
+          {error && (
+            <div className="pointer-events-auto flex items-start gap-2 rounded-lg border border-red-200 bg-white px-4 py-3 font-body text-sm text-red-700 shadow-lg ring-1 ring-black/5 animate-dialog-in">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+              <span className="flex-1">{error}</span>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                className="ml-2 -mr-1 rounded p-0.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
