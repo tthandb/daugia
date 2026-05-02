@@ -29,8 +29,8 @@ export default function NewArticlePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    clientFetch<Category[]>("/categories")
-      .then(setCategories)
+    clientFetch<{ data: Category[] }>("/categories")
+      .then((res) => setCategories(res.data))
       .catch(() => {});
   }, []);
 
@@ -109,7 +109,8 @@ export default function NewArticlePage() {
         throw new Error(data.error || "Tải lên thất bại");
       }
 
-      const article = await res.json();
+      const json = await res.json();
+      const article = json.data ?? json;
       router.push(`/admin/articles/${article.id}/edit`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tải lên thất bại");

@@ -73,13 +73,14 @@ export default function EditArticlePage() {
 
   const loadArticle = useCallback(async () => {
     try {
-      const [articleData, categoriesData] = await Promise.all([
-        clientFetch<Article>(`/admin/articles/${id}`),
-        clientFetch<Category[]>("/categories"),
+      const [articleRes, categoriesRes] = await Promise.all([
+        clientFetch<{ data: Article }>(`/admin/articles/${id}`),
+        clientFetch<{ data: Category[] }>("/categories"),
       ]);
 
+      const articleData = articleRes.data;
       setArticle(articleData);
-      setCategories(categoriesData);
+      setCategories(categoriesRes.data);
       setImages(articleData.images || []);
       setAttachments(articleData.attachments || []);
 
@@ -254,10 +255,7 @@ export default function EditArticlePage() {
   async function handleUnpublish() {
     setError("");
     try {
-      await clientFetch(`/admin/articles/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "DRAFT" }),
-      });
+      await clientFetch(`/admin/articles/${id}/unpublish`, { method: "POST" });
       await loadArticle();
       showSuccess("Đã gỡ xuất bản");
     } catch (err) {
@@ -268,10 +266,7 @@ export default function EditArticlePage() {
   async function handleArchive() {
     setError("");
     try {
-      await clientFetch(`/admin/articles/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "ARCHIVED" }),
-      });
+      await clientFetch(`/admin/articles/${id}/archive`, { method: "POST" });
       await loadArticle();
       showSuccess("Đã lưu trữ bài viết");
     } catch (err) {

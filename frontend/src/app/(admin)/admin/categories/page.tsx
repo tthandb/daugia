@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { clientFetch, type Category } from "@/lib/api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -26,11 +27,16 @@ export default function CategoriesPage() {
 
   // Delete state
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteTarget = deleteId
+    ? categories.find((c) => c.id === deleteId)
+    : null;
 
   async function fetchCategories() {
     try {
-      const data = await clientFetch<Category[]>("/categories");
-      setCategories(data);
+      const res = await clientFetch<{ data: Category[] }>("/categories");
+      setCategories(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tải dữ liệu");
     } finally {
@@ -99,12 +105,15 @@ export default function CategoriesPage() {
 
   async function handleDelete(id: string) {
     setError("");
+    setDeleting(true);
     try {
       await clientFetch(`/admin/categories/${id}`, { method: "DELETE" });
       setDeleteId(null);
       await fetchCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xoá thất bại");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -370,36 +379,31 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Delete confirmation */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-lg font-semibold text-charcoal">
-              Xác nhận xoá
-            </h3>
-            <p className="mt-2 font-body text-sm text-muted-fg">
-              Bạn có chắc chắn muốn xoá danh mục này? Các bài viết thuộc danh
-              mục sẽ không bị xoá.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteId(null)}
-                className="rounded-md border border-warm-border px-4 py-2 font-body text-sm font-medium text-muted-fg hover:bg-warm-white"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteId)}
-                className="rounded-md bg-red-600 px-4 py-2 font-body text-sm font-medium text-white hover:bg-red-700"
-              >
-                Xoá
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Xoá danh mục"
+        description={
+          <>
+            Bạn có chắc chắn muốn xoá danh mục
+            {deleteTarget ? (
+              <>
+                {" "}
+                <span className="font-medium text-charcoal">
+                  &ldquo;{deleteTarget.name}&rdquo;
+                </span>
+              </>
+            ) : (
+              " này"
+            )}
+            ? Các bài viết thuộc danh mục sẽ không bị xoá.
+          </>
+        }
+        confirmLabel="Xoá"
+        destructive
+        loading={deleting}
+        onConfirm={() => deleteId && handleDelete(deleteId)}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   );
 }

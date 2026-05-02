@@ -128,11 +128,13 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
+WHERE (sqlc.narg('status')::text IS NULL OR a.status = sqlc.narg('status')::text)
 ORDER BY a.created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: AdminCountArticles :one
-SELECT count(*) FROM articles;
+SELECT count(*) FROM articles
+WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
 
 -- name: AdminCountArticlesByStatus :one
 SELECT count(*) FROM articles WHERE status = $1;

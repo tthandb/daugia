@@ -34,13 +34,13 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [statsData, articlesData] = await Promise.all([
-          clientFetch<AdminStats>("/admin/stats"),
+        const [statsRes, articlesData] = await Promise.all([
+          clientFetch<{ data: AdminStats }>("/admin/stats"),
           clientFetch<PaginatedResponse<Article>>("/admin/articles", {
             params: { per_page: "5" },
           }),
         ]);
-        setStats(statsData);
+        setStats(statsRes.data);
         setArticles(articlesData.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Không thể tải dữ liệu");

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { clientFetch, type Tag } from "@/lib/api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export default function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -17,11 +18,14 @@ export default function TagsPage() {
 
   // Delete state
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteTarget = deleteId ? tags.find((t) => t.id === deleteId) : null;
 
   async function fetchTags() {
     try {
-      const data = await clientFetch<Tag[]>("/tags");
-      setTags(data);
+      const res = await clientFetch<{ data: Tag[] }>("/tags");
+      setTags(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tải dữ liệu");
     } finally {
@@ -58,12 +62,15 @@ export default function TagsPage() {
 
   async function handleDelete(id: string) {
     setError("");
+    setDeleting(true);
     try {
       await clientFetch(`/admin/tags/${id}`, { method: "DELETE" });
       setDeleteId(null);
       await fetchTags();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xoá thất bại");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -191,36 +198,31 @@ export default function TagsPage() {
         </div>
       </div>
 
-      {/* Delete confirmation */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-lg font-semibold text-charcoal">
-              Xác nhận xoá
-            </h3>
-            <p className="mt-2 font-body text-sm text-muted-fg">
-              Bạn có chắc chắn muốn xoá thẻ này? Thẻ sẽ bị gỡ khỏi tất cả bài
-              viết đang sử dụng.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteId(null)}
-                className="rounded-md border border-warm-border px-4 py-2 font-body text-sm font-medium text-muted-fg hover:bg-warm-white"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteId)}
-                className="rounded-md bg-red-600 px-4 py-2 font-body text-sm font-medium text-white hover:bg-red-700"
-              >
-                Xoá
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Xoá thẻ"
+        description={
+          <>
+            Bạn có chắc chắn muốn xoá thẻ
+            {deleteTarget ? (
+              <>
+                {" "}
+                <span className="font-medium text-charcoal">
+                  &ldquo;{deleteTarget.name}&rdquo;
+                </span>
+              </>
+            ) : (
+              " này"
+            )}
+            ? Thẻ sẽ bị gỡ khỏi tất cả bài viết đang sử dụng.
+          </>
+        }
+        confirmLabel="Xoá"
+        destructive
+        loading={deleting}
+        onConfirm={() => deleteId && handleDelete(deleteId)}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   );
 }

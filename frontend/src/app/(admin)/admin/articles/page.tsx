@@ -17,6 +17,7 @@ import {
   type PaginatedResponse,
 } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT" | "ARCHIVED";
 
@@ -55,6 +56,11 @@ export default function ArticlesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteTarget = deleteId
+    ? articles.find((a) => a.id === deleteId)
+    : null;
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -86,27 +92,24 @@ export default function ArticlesPage() {
   }, [fetchArticles]);
 
   async function handleDelete(id: string) {
+    setDeleting(true);
     try {
       await clientFetch(`/admin/articles/${id}`, { method: "DELETE" });
       setDeleteId(null);
-      fetchArticles();
+      await fetchArticles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xoá thất bại");
+    } finally {
+      setDeleting(false);
     }
   }
 
   async function handleTogglePublish(article: Article) {
     try {
-      if (article.status === "PUBLISHED") {
-        await clientFetch(`/admin/articles/${article.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: "DRAFT" }),
-        });
-      } else {
-        await clientFetch(`/admin/articles/${article.id}/publish`, {
-          method: "POST",
-        });
-      }
+      const action = article.status === "PUBLISHED" ? "unpublish" : "publish";
+      await clientFetch(`/admin/articles/${article.id}/${action}`, {
+        method: "POST",
+      });
       fetchArticles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật thất bại");
@@ -303,36 +306,31 @@ export default function ArticlesPage() {
         )}
       </div>
 
-      {/* Delete confirmation dialog */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-lg font-semibold text-charcoal">
-              Xác nhận xoá
-            </h3>
-            <p className="mt-2 font-body text-sm text-muted-fg">
-              Bạn có chắc chắn muốn xoá bài viết này? Hành động này không thể
-              hoàn tác.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteId(null)}
-                className="rounded-md border border-warm-border px-4 py-2 font-body text-sm font-medium text-muted-fg transition-colors hover:bg-warm-white"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteId)}
-                className="rounded-md bg-red-600 px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:bg-red-700"
-              >
-                Xoá
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Xoá bài viết"
+        description={
+          <>
+            Bạn có chắc chắn muốn xoá
+            {deleteTarget ? (
+              <>
+                {" "}bài viết{" "}
+                <span className="font-medium text-charcoal">
+                  &ldquo;{deleteTarget.title}&rdquo;
+                </span>
+              </>
+            ) : (
+              " bài viết này"
+            )}
+            ? Hành động này không thể hoàn tác.
+          </>
+        }
+        confirmLabel="Xoá"
+        destructive
+        loading={deleting}
+        onConfirm={() => deleteId && handleDelete(deleteId)}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   );
 }

@@ -26,7 +26,14 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
     throw new Error(error.error || `API error: ${res.status}`);
   }
 
-  return res.json();
+  return parseJsonOrEmpty<T>(res);
+}
+
+async function parseJsonOrEmpty<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 // Server-side fetch (includes cookies for auth)
@@ -65,7 +72,7 @@ export async function clientFetch<T>(
     throw new Error(error.error || `API error: ${res.status}`);
   }
 
-  return res.json();
+  return parseJsonOrEmpty<T>(res);
 }
 
 // Types

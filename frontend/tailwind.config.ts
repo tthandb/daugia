@@ -24,6 +24,20 @@ const config: Config = {
         body: ["Be Vietnam Pro", "sans-serif"],
         document: ["Times New Roman", "Times", "serif"],
       },
+      keyframes: {
+        "overlay-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "dialog-in": {
+          from: { opacity: "0", transform: "translateY(8px) scale(0.97)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+      },
+      animation: {
+        "overlay-in": "overlay-in 160ms ease-out",
+        "dialog-in": "dialog-in 180ms cubic-bezier(0.16, 1, 0.3, 1)",
+      },
       typography: {
         DEFAULT: {
           css: {

@@ -21,7 +21,7 @@ import (
 func (h *Handler) AdminStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	total, _ := h.queries.AdminCountArticles(ctx)
+	total, _ := h.queries.AdminCountArticles(ctx, nil)
 	published, _ := h.queries.AdminCountArticlesByStatus(ctx, "PUBLISHED")
 	drafts, _ := h.queries.AdminCountArticlesByStatus(ctx, "DRAFT")
 	archived, _ := h.queries.AdminCountArticlesByStatus(ctx, "ARCHIVED")
@@ -46,16 +46,25 @@ func (h *Handler) AdminListArticles(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
+	var status *string
+	if s := r.URL.Query().Get("status"); s != "" {
+		switch s {
+		case "PUBLISHED", "DRAFT", "ARCHIVED":
+			status = &s
+		}
+	}
+
 	articles, err := h.queries.AdminListArticles(ctx, db.AdminListArticlesParams{
 		Limit:  limit,
 		Offset: offset,
+		Status: status,
 	})
 	if err != nil {
 		writeError(w, 500, "failed to list articles")
 		return
 	}
 
-	total, _ := h.queries.AdminCountArticles(ctx)
+	total, _ := h.queries.AdminCountArticles(ctx, status)
 
 	items := make([]map[string]any, len(articles))
 	for i, a := range articles {
@@ -74,6 +83,7 @@ func (h *Handler) AdminListArticles(w http.ResponseWriter, r *http.Request) {
 			"publishedAt":   a.PublishedAt,
 			"thumbnailUrl":  thumbnailURL,
 			"viewCount":     a.ViewCount,
+			"categoryId":    a.CategoryID,
 			"categoryName":  a.CategoryName,
 			"categorySlug":  a.CategorySlug,
 			"categoryColor": a.CategoryColor,
