@@ -44,6 +44,11 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     expose:
       - "8080"
+    # TEMPORARY: direct host-port exposure while api.daugiavinhyen.com is under
+    # registrar review. Remove this `ports:` block once DNS is live and you've
+    # tested via Caddy.
+    ports:
+      - "8080:8080"
     mem_limit: 1g
     networks:
       - internal
