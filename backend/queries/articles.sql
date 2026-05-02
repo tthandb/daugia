@@ -3,6 +3,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -13,6 +15,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -23,6 +27,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -35,6 +41,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -47,6 +55,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -59,6 +69,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -72,6 +84,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -98,6 +112,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color,
        ts_rank(a.search_vector, plainto_tsquery('simple', $1)) as rank
 FROM articles a
@@ -125,6 +141,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -159,7 +177,9 @@ INSERT INTO articles (
 RETURNING id, title, slug, description, author_name, content_html, content_plain,
           status, published_at, province, district, ward, asset_type, plot_count,
           total_area, thumbnail_key, original_file_key, original_file_name, original_file_mime,
-          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at;
+          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at,
+          meta_description, auction_start, auction_end, venue_name, venue_address,
+          starting_price, deposit_amount;
 
 -- name: UpdateArticle :one
 UPDATE articles SET
@@ -176,12 +196,21 @@ UPDATE articles SET
     plot_count = COALESCE(sqlc.narg('plot_count'), plot_count),
     total_area = COALESCE(sqlc.narg('total_area'), total_area),
     thumbnail_key = COALESCE(sqlc.narg('thumbnail_key'), thumbnail_key),
-    category_id = COALESCE(sqlc.narg('category_id'), category_id)
+    category_id = COALESCE(sqlc.narg('category_id'), category_id),
+    meta_description = COALESCE(sqlc.narg('meta_description'), meta_description),
+    auction_start = COALESCE(sqlc.narg('auction_start'), auction_start),
+    auction_end = COALESCE(sqlc.narg('auction_end'), auction_end),
+    venue_name = COALESCE(sqlc.narg('venue_name'), venue_name),
+    venue_address = COALESCE(sqlc.narg('venue_address'), venue_address),
+    starting_price = COALESCE(sqlc.narg('starting_price'), starting_price),
+    deposit_amount = COALESCE(sqlc.narg('deposit_amount'), deposit_amount)
 WHERE id = @id
 RETURNING id, title, slug, description, author_name, content_html, content_plain,
           status, published_at, province, district, ward, asset_type, plot_count,
           total_area, thumbnail_key, original_file_key, original_file_name, original_file_mime,
-          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at;
+          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at,
+          meta_description, auction_start, auction_end, venue_name, venue_address,
+          starting_price, deposit_amount;
 
 -- name: PublishArticle :exec
 UPDATE articles SET status = 'PUBLISHED', published_at = now() WHERE id = $1;

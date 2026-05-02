@@ -234,6 +234,29 @@ func (h *Handler) GetArticle(w http.ResponseWriter, r *http.Request) {
 		result["originalFileMime"] = *article.OriginalFileMime
 	}
 
+	// SEO + auction Event schema fields. Nil-safe — clients use what they receive.
+	if article.MetaDescription != nil && *article.MetaDescription != "" {
+		result["metaDescription"] = *article.MetaDescription
+	}
+	if article.AuctionStart != nil {
+		result["auctionStart"] = *article.AuctionStart
+	}
+	if article.AuctionEnd != nil {
+		result["auctionEnd"] = *article.AuctionEnd
+	}
+	if article.VenueName != nil && *article.VenueName != "" {
+		result["venueName"] = *article.VenueName
+	}
+	if article.VenueAddress != nil && *article.VenueAddress != "" {
+		result["venueAddress"] = *article.VenueAddress
+	}
+	if article.StartingPrice.Valid {
+		result["startingPrice"] = article.StartingPrice.Int64
+	}
+	if article.DepositAmount.Valid {
+		result["depositAmount"] = article.DepositAmount.Int64
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 

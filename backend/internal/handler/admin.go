@@ -149,6 +149,7 @@ func (h *Handler) AdminGetArticle(w http.ResponseWriter, r *http.Request) {
 		"title":            article.Title,
 		"slug":             article.Slug,
 		"description":      article.Description,
+		"metaDescription":  article.MetaDescription,
 		"authorName":       article.AuthorName,
 		"contentHtml":      article.ContentHtml,
 		"status":           article.Status,
@@ -172,6 +173,16 @@ func (h *Handler) AdminGetArticle(w http.ResponseWriter, r *http.Request) {
 		"attachments":      attachList,
 		"createdAt":        article.CreatedAt,
 		"updatedAt":        article.UpdatedAt,
+		"auctionStart":     article.AuctionStart,
+		"auctionEnd":       article.AuctionEnd,
+		"venueName":        article.VenueName,
+		"venueAddress":     article.VenueAddress,
+	}
+	if article.StartingPrice.Valid {
+		result["startingPrice"] = article.StartingPrice.Int64
+	}
+	if article.DepositAmount.Valid {
+		result["depositAmount"] = article.DepositAmount.Int64
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": result})
@@ -315,19 +326,26 @@ func (h *Handler) AdminUpdateArticle(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var req struct {
-		Title        *string `json:"title"`
-		Slug         *string `json:"slug"`
-		Description  *string `json:"description"`
-		AuthorName   *string `json:"authorName"`
-		ContentHtml  *string `json:"contentHtml"`
-		ContentPlain *string `json:"contentPlain"`
-		Province     *string `json:"province"`
-		District     *string `json:"district"`
-		Ward         *string `json:"ward"`
-		AssetType    *string `json:"assetType"`
-		PlotCount    *int32  `json:"plotCount"`
-		TotalArea    *string `json:"totalArea"`
-		CategoryID   *string `json:"categoryId"`
+		Title           *string    `json:"title"`
+		Slug            *string    `json:"slug"`
+		Description     *string    `json:"description"`
+		MetaDescription *string    `json:"metaDescription"`
+		AuthorName      *string    `json:"authorName"`
+		ContentHtml     *string    `json:"contentHtml"`
+		ContentPlain    *string    `json:"contentPlain"`
+		Province        *string    `json:"province"`
+		District        *string    `json:"district"`
+		Ward            *string    `json:"ward"`
+		AssetType       *string    `json:"assetType"`
+		PlotCount       *int32     `json:"plotCount"`
+		TotalArea       *string    `json:"totalArea"`
+		CategoryID      *string    `json:"categoryId"`
+		AuctionStart    *time.Time `json:"auctionStart"`
+		AuctionEnd      *time.Time `json:"auctionEnd"`
+		VenueName       *string    `json:"venueName"`
+		VenueAddress    *string    `json:"venueAddress"`
+		StartingPrice   *int64     `json:"startingPrice"`
+		DepositAmount   *int64     `json:"depositAmount"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, 400, "invalid request body")
@@ -338,23 +356,38 @@ func (h *Handler) AdminUpdateArticle(w http.ResponseWriter, r *http.Request) {
 	if req.PlotCount != nil {
 		plotCount = pgtype.Int4{Int32: *req.PlotCount, Valid: true}
 	}
+	var startingPrice pgtype.Int8
+	if req.StartingPrice != nil {
+		startingPrice = pgtype.Int8{Int64: *req.StartingPrice, Valid: true}
+	}
+	var depositAmount pgtype.Int8
+	if req.DepositAmount != nil {
+		depositAmount = pgtype.Int8{Int64: *req.DepositAmount, Valid: true}
+	}
 
 	article, err := h.queries.UpdateArticle(ctx, db.UpdateArticleParams{
-		ID:           id,
-		Title:        req.Title,
-		Slug:         req.Slug,
-		Description:  req.Description,
-		AuthorName:   req.AuthorName,
-		ContentHtml:  req.ContentHtml,
-		ContentPlain: req.ContentPlain,
-		Province:     req.Province,
-		District:     req.District,
-		Ward:         req.Ward,
-		AssetType:    req.AssetType,
-		PlotCount:    plotCount,
-		TotalArea:    req.TotalArea,
-		ThumbnailKey: nil, // don't update via this endpoint
-		CategoryID:   req.CategoryID,
+		ID:              id,
+		Title:           req.Title,
+		Slug:            req.Slug,
+		Description:     req.Description,
+		MetaDescription: req.MetaDescription,
+		AuthorName:      req.AuthorName,
+		ContentHtml:     req.ContentHtml,
+		ContentPlain:    req.ContentPlain,
+		Province:        req.Province,
+		District:        req.District,
+		Ward:            req.Ward,
+		AssetType:       req.AssetType,
+		PlotCount:       plotCount,
+		TotalArea:       req.TotalArea,
+		ThumbnailKey:    nil,
+		CategoryID:      req.CategoryID,
+		AuctionStart:    req.AuctionStart,
+		AuctionEnd:      req.AuctionEnd,
+		VenueName:       req.VenueName,
+		VenueAddress:    req.VenueAddress,
+		StartingPrice:   startingPrice,
+		DepositAmount:   depositAmount,
 	})
 	if err != nil {
 		writeError(w, 500, "failed to update article")

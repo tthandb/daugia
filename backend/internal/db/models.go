@@ -37,6 +37,13 @@ type Article struct {
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
 	SearchVector     interface{} `json:"search_vector"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 }
 
 type ArticleAttachment struct {

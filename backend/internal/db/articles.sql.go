@@ -41,6 +41,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -81,6 +83,13 @@ type AdminListArticlesRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -122,6 +131,13 @@ func (q *Queries) AdminListArticles(ctx context.Context, arg AdminListArticlesPa
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -232,7 +248,9 @@ INSERT INTO articles (
 RETURNING id, title, slug, description, author_name, content_html, content_plain,
           status, published_at, province, district, ward, asset_type, plot_count,
           total_area, thumbnail_key, original_file_key, original_file_name, original_file_mime,
-          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at
+          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at,
+          meta_description, auction_start, auction_end, venue_name, venue_address,
+          starting_price, deposit_amount
 `
 
 type CreateArticleParams struct {
@@ -286,6 +304,13 @@ type CreateArticleRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 }
 
 func (q *Queries) CreateArticle(ctx context.Context, arg CreateArticleParams) (CreateArticleRow, error) {
@@ -340,6 +365,13 @@ func (q *Queries) CreateArticle(ctx context.Context, arg CreateArticleParams) (C
 		&i.CategoryID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MetaDescription,
+		&i.AuctionStart,
+		&i.AuctionEnd,
+		&i.VenueName,
+		&i.VenueAddress,
+		&i.StartingPrice,
+		&i.DepositAmount,
 	)
 	return i, err
 }
@@ -358,6 +390,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -392,6 +426,13 @@ type FeaturedArticlesRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -432,6 +473,13 @@ func (q *Queries) FeaturedArticles(ctx context.Context, limit int32) ([]Featured
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -451,6 +499,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -483,6 +533,13 @@ type GetArticleByIDRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -517,6 +574,13 @@ func (q *Queries) GetArticleByID(ctx context.Context, id string) (GetArticleByID
 		&i.CategoryID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MetaDescription,
+		&i.AuctionStart,
+		&i.AuctionEnd,
+		&i.VenueName,
+		&i.VenueAddress,
+		&i.StartingPrice,
+		&i.DepositAmount,
 		&i.CategoryName,
 		&i.CategorySlug,
 		&i.CategoryColor,
@@ -529,6 +593,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -561,6 +627,13 @@ type GetArticleBySlugRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -595,6 +668,13 @@ func (q *Queries) GetArticleBySlug(ctx context.Context, slug string) (GetArticle
 		&i.CategoryID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MetaDescription,
+		&i.AuctionStart,
+		&i.AuctionEnd,
+		&i.VenueName,
+		&i.VenueAddress,
+		&i.StartingPrice,
+		&i.DepositAmount,
 		&i.CategoryName,
 		&i.CategorySlug,
 		&i.CategoryColor,
@@ -645,6 +725,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -684,6 +766,13 @@ type ListPublishedArticlesRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -724,6 +813,13 @@ func (q *Queries) ListPublishedArticles(ctx context.Context, arg ListPublishedAr
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -743,6 +839,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -783,6 +881,13 @@ type ListPublishedArticlesByCategoryRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -823,6 +928,13 @@ func (q *Queries) ListPublishedArticlesByCategory(ctx context.Context, arg ListP
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -842,6 +954,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -882,6 +996,13 @@ type ListPublishedArticlesByProvinceRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -922,6 +1043,13 @@ func (q *Queries) ListPublishedArticlesByProvince(ctx context.Context, arg ListP
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -941,6 +1069,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
@@ -982,6 +1112,13 @@ type ListPublishedArticlesByTagRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -1022,6 +1159,13 @@ func (q *Queries) ListPublishedArticlesByTag(ctx context.Context, arg ListPublis
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -1050,6 +1194,8 @@ SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.co
        a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
        a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
        a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
+       a.starting_price, a.deposit_amount,
        c.name as category_name, c.slug as category_slug, c.color as category_color,
        ts_rank(a.search_vector, plainto_tsquery('simple', $1)) as rank
 FROM articles a
@@ -1092,6 +1238,13 @@ type SearchArticlesRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 	CategoryName     *string     `json:"category_name"`
 	CategorySlug     *string     `json:"category_slug"`
 	CategoryColor    *string     `json:"category_color"`
@@ -1133,6 +1286,13 @@ func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) 
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MetaDescription,
+			&i.AuctionStart,
+			&i.AuctionEnd,
+			&i.VenueName,
+			&i.VenueAddress,
+			&i.StartingPrice,
+			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -1172,30 +1332,46 @@ UPDATE articles SET
     plot_count = COALESCE($11, plot_count),
     total_area = COALESCE($12, total_area),
     thumbnail_key = COALESCE($13, thumbnail_key),
-    category_id = COALESCE($14, category_id)
-WHERE id = $15
+    category_id = COALESCE($14, category_id),
+    meta_description = COALESCE($15, meta_description),
+    auction_start = COALESCE($16, auction_start),
+    auction_end = COALESCE($17, auction_end),
+    venue_name = COALESCE($18, venue_name),
+    venue_address = COALESCE($19, venue_address),
+    starting_price = COALESCE($20, starting_price),
+    deposit_amount = COALESCE($21, deposit_amount)
+WHERE id = $22
 RETURNING id, title, slug, description, author_name, content_html, content_plain,
           status, published_at, province, district, ward, asset_type, plot_count,
           total_area, thumbnail_key, original_file_key, original_file_name, original_file_mime,
-          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at
+          legacy_id, legacy_file_key, view_count, category_id, created_at, updated_at,
+          meta_description, auction_start, auction_end, venue_name, venue_address,
+          starting_price, deposit_amount
 `
 
 type UpdateArticleParams struct {
-	Title        *string     `json:"title"`
-	Slug         *string     `json:"slug"`
-	Description  *string     `json:"description"`
-	AuthorName   *string     `json:"author_name"`
-	ContentHtml  *string     `json:"content_html"`
-	ContentPlain *string     `json:"content_plain"`
-	Province     *string     `json:"province"`
-	District     *string     `json:"district"`
-	Ward         *string     `json:"ward"`
-	AssetType    *string     `json:"asset_type"`
-	PlotCount    pgtype.Int4 `json:"plot_count"`
-	TotalArea    *string     `json:"total_area"`
-	ThumbnailKey *string     `json:"thumbnail_key"`
-	CategoryID   *string     `json:"category_id"`
-	ID           string      `json:"id"`
+	Title           *string     `json:"title"`
+	Slug            *string     `json:"slug"`
+	Description     *string     `json:"description"`
+	AuthorName      *string     `json:"author_name"`
+	ContentHtml     *string     `json:"content_html"`
+	ContentPlain    *string     `json:"content_plain"`
+	Province        *string     `json:"province"`
+	District        *string     `json:"district"`
+	Ward            *string     `json:"ward"`
+	AssetType       *string     `json:"asset_type"`
+	PlotCount       pgtype.Int4 `json:"plot_count"`
+	TotalArea       *string     `json:"total_area"`
+	ThumbnailKey    *string     `json:"thumbnail_key"`
+	CategoryID      *string     `json:"category_id"`
+	MetaDescription *string     `json:"meta_description"`
+	AuctionStart    *time.Time  `json:"auction_start"`
+	AuctionEnd      *time.Time  `json:"auction_end"`
+	VenueName       *string     `json:"venue_name"`
+	VenueAddress    *string     `json:"venue_address"`
+	StartingPrice   pgtype.Int8 `json:"starting_price"`
+	DepositAmount   pgtype.Int8 `json:"deposit_amount"`
+	ID              string      `json:"id"`
 }
 
 type UpdateArticleRow struct {
@@ -1224,6 +1400,13 @@ type UpdateArticleRow struct {
 	CategoryID       *string     `json:"category_id"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	MetaDescription  *string     `json:"meta_description"`
+	AuctionStart     *time.Time  `json:"auction_start"`
+	AuctionEnd       *time.Time  `json:"auction_end"`
+	VenueName        *string     `json:"venue_name"`
+	VenueAddress     *string     `json:"venue_address"`
+	StartingPrice    pgtype.Int8 `json:"starting_price"`
+	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
 }
 
 func (q *Queries) UpdateArticle(ctx context.Context, arg UpdateArticleParams) (UpdateArticleRow, error) {
@@ -1242,6 +1425,13 @@ func (q *Queries) UpdateArticle(ctx context.Context, arg UpdateArticleParams) (U
 		arg.TotalArea,
 		arg.ThumbnailKey,
 		arg.CategoryID,
+		arg.MetaDescription,
+		arg.AuctionStart,
+		arg.AuctionEnd,
+		arg.VenueName,
+		arg.VenueAddress,
+		arg.StartingPrice,
+		arg.DepositAmount,
 		arg.ID,
 	)
 	var i UpdateArticleRow
@@ -1271,6 +1461,13 @@ func (q *Queries) UpdateArticle(ctx context.Context, arg UpdateArticleParams) (U
 		&i.CategoryID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MetaDescription,
+		&i.AuctionStart,
+		&i.AuctionEnd,
+		&i.VenueName,
+		&i.VenueAddress,
+		&i.StartingPrice,
+		&i.DepositAmount,
 	)
 	return i, err
 }
