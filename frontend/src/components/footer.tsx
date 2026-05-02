@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { COMPANY, mapsSearchUrl } from "@/lib/company";
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -7,28 +8,42 @@ export function Footer() {
     <footer className="bg-charcoal text-warm-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center gap-6 text-center">
-          {/* Company name */}
+          {/* Brand mark */}
           <Link
             href="/"
             className="font-heading text-2xl font-bold text-warm-white"
           >
-            ĐẤUGIÁ.
+            {COMPANY.brandMark}
           </Link>
 
           <p className="font-body text-sm font-medium uppercase tracking-wider text-warm-white/80">
-            Công Ty Đấu Giá Hợp Danh Vĩnh Yên
+            {COMPANY.legalNameUpper}
           </p>
+
+          {/* Address */}
+          <address className="not-italic font-body text-sm text-warm-white/70">
+            <a
+              href={mapsSearchUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-gold"
+            >
+              {COMPANY.address.full}
+            </a>
+          </address>
 
           {/* Contact info */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-body text-sm text-warm-white/60">
             <a
-              href="tel:0912535999"
+              href={`tel:${COMPANY.phoneTel}`}
               className="transition-colors hover:text-gold"
             >
-              0912535999
+              {COMPANY.phoneDisplay}
             </a>
             <span className="hidden sm:inline">|</span>
-            <span>MST: 2500634576</span>
+            <span>MST: {COMPANY.taxId}</span>
+            <span className="hidden sm:inline">|</span>
+            <span>Đại diện: {COMPANY.representative}</span>
           </div>
 
           {/* Nav links */}
@@ -40,13 +55,7 @@ export function Footer() {
               Nghiên Cứu
             </Link>
             <Link
-              href="#"
-              className="text-warm-white/60 transition-colors hover:text-gold"
-            >
-              Đấu Giá
-            </Link>
-            <Link
-              href="#"
+              href="/about"
               className="text-warm-white/60 transition-colors hover:text-gold"
             >
               Giới Thiệu
@@ -58,8 +67,7 @@ export function Footer() {
 
           {/* Copyright */}
           <p className="font-body text-xs text-warm-white/40">
-            &copy; {year} Công Ty Đấu Giá Hợp Danh Vĩnh Yên. Bản quyền thuộc
-            về công ty.
+            &copy; {year} {COMPANY.legalName}. Bản quyền thuộc về công ty.
           </p>
         </div>
       </div>

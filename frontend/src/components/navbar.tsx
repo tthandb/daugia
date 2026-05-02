@@ -3,12 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Search, Menu, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { COMPANY } from "@/lib/company";
 
 const navLinks = [
   { label: "Nghiên Cứu", href: "/articles" },
-  { label: "Đấu Giá", href: "#" },
-  { label: "Giới Thiệu", href: "#" },
+  { label: "Giới Thiệu", href: "/about" },
 ];
 
 export function Navbar() {
@@ -17,12 +16,18 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-warm-border bg-white">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
+        {/* Logo — two-line: brand mark + legal name */}
         <Link
           href="/"
-          className="font-heading text-2xl font-bold text-charcoal"
+          className="flex flex-col leading-none"
+          aria-label={COMPANY.legalName}
         >
-          ĐẤUGIÁ.
+          <span className="font-heading text-2xl font-bold text-charcoal">
+            {COMPANY.brandMark}
+          </span>
+          <span className="hidden sm:block mt-1 font-body text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg">
+            {COMPANY.legalNameUpper}
+          </span>
         </Link>
 
         {/* Center nav — desktop */}

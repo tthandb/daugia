@@ -4,11 +4,16 @@ import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { CategoryFilter } from "@/components/category-filter";
 import { Pagination } from "@/components/pagination";
+import { COMPANY } from "@/lib/company";
 
 export const metadata: Metadata = {
   title: "Thư Viện Nghiên Cứu",
-  description:
-    "Thư viện nghiên cứu thị trường đấu giá bất động sản - Công ty Đấu giá Hợp danh Vĩnh Yên",
+  description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.legalName}, ${COMPANY.address.region}.`,
+  alternates: { canonical: "/articles" },
+  openGraph: {
+    url: `${COMPANY.url}/articles`,
+    title: `Thư Viện Nghiên Cứu | ${COMPANY.shortName}`,
+  },
 };
 
 interface ArticlesPageProps {

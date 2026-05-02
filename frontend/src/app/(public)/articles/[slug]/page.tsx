@@ -5,6 +5,7 @@ import { serverFetch } from "@/lib/api";
 import type { Article } from "@/lib/api";
 import { formatDate, formatFileSize } from "@/lib/utils";
 import { ViewTracker } from "@/components/view-tracker";
+import { COMPANY } from "@/lib/company";
 
 export const revalidate = 60;
 
@@ -58,19 +59,31 @@ export async function generateMetadata({
     return { title: "Bài viết không tồn tại" };
   }
 
+  const canonical = `/articles/${article.slug}`;
+
   return {
     title: article.title,
     description: article.description,
+    alternates: { canonical },
     openGraph: {
       title: article.title,
       description: article.description,
       type: "article",
       locale: "vi_VN",
+      url: `${COMPANY.url}${canonical}`,
+      siteName: COMPANY.legalName,
       publishedTime: article.publishedAt || undefined,
+      modifiedTime: article.updatedAt || undefined,
       authors: [article.authorName],
       ...(article.thumbnailUrl && {
         images: [{ url: article.thumbnailUrl, width: 800, height: 450 }],
       }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.description,
+      ...(article.thumbnailUrl && { images: [article.thumbnailUrl] }),
     },
   };
 }
@@ -164,25 +177,47 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const attachments = article.attachments || [];
   const tags = article.tags || [];
 
-  // JSON-LD structured data
+  // JSON-LD structured data — Article + BreadcrumbList graph
+  const articleUrl = `${COMPANY.url}/articles/${article.slug}`;
+
+  const breadcrumbItems: { name: string; item: string }[] = [
+    { name: "Trang Chủ", item: COMPANY.url },
+    { name: "Thư Viện Nghiên Cứu", item: `${COMPANY.url}/articles` },
+  ];
+  if (article.categoryName && article.categorySlug) {
+    breadcrumbItems.push({
+      name: article.categoryName,
+      item: `${COMPANY.url}/articles?category=${article.categorySlug}`,
+    });
+  }
+  breadcrumbItems.push({ name: article.title, item: articleUrl });
+
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    headline: article.title,
-    description: article.description,
-    author: {
-      "@type": "Person",
-      name: article.authorName,
-    },
-    datePublished: article.publishedAt,
-    dateModified: article.updatedAt,
-    publisher: {
-      "@type": "Organization",
-      name: "Công ty Đấu giá Hợp danh Vĩnh Yên",
-    },
-    ...(article.thumbnailUrl && {
-      image: article.thumbnailUrl,
-    }),
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${articleUrl}#article`,
+        mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
+        headline: article.title,
+        description: article.description,
+        inLanguage: "vi-VN",
+        author: { "@type": "Person", name: article.authorName },
+        datePublished: article.publishedAt,
+        dateModified: article.updatedAt,
+        publisher: { "@id": COMPANY.ids.organization },
+        ...(article.thumbnailUrl && { image: article.thumbnailUrl }),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbItems.map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: item.name,
+          item: item.item,
+        })),
+      },
+    ],
   };
 
   return (

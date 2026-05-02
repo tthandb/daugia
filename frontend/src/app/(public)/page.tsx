@@ -4,11 +4,21 @@ import { ArrowRight } from "lucide-react";
 import { serverFetch } from "@/lib/api";
 import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
+import { COMPANY } from "@/lib/company";
 
 export const metadata: Metadata = {
-  title: "Trang Chủ | ĐẤU GIÁ",
+  title: {
+    absolute: `${COMPANY.legalName} — ${COMPANY.tagline}`,
+  },
   description:
-    "Cổng thông tin nghiên cứu thị trường đấu giá bất động sản - Công ty Đấu giá Hợp danh Vĩnh Yên",
+    `${COMPANY.legalName} — đấu giá bất động sản tại ${COMPANY.address.region}. ` +
+    `Cổng nghiên cứu thị trường cho nhà đầu tư & chuyên gia đấu giá.`,
+  alternates: { canonical: "/" },
+  openGraph: {
+    url: COMPANY.url,
+    title: COMPANY.legalName,
+    description: `${COMPANY.tagline} — ${COMPANY.legalName}.`,
+  },
 };
 
 async function getFeaturedArticles() {
@@ -56,12 +66,16 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-[url('/grain.png')] opacity-5" />
         <div className="container-wide relative">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="font-heading text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
+            <p className="font-body text-xs font-semibold uppercase tracking-[0.25em] text-gold sm:text-sm">
+              {COMPANY.legalNameUpper}
+            </p>
+            <h1 className="mt-4 font-heading text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
               Nghiên Cứu Thị Trường Đấu Giá Bất Động Sản
             </h1>
             <p className="mx-auto mt-6 max-w-xl font-body text-lg text-stone-400 leading-relaxed">
               Cổng thông tin nghiên cứu chuyên sâu về thị trường đấu giá bất
-              động sản, phục vụ nhà đầu tư và chuyên gia trong ngành.
+              động sản tại {COMPANY.address.region}, phục vụ nhà đầu tư và
+              chuyên gia trong ngành.
             </p>
             <Link
               href="/articles"
