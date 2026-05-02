@@ -3,8 +3,9 @@ FROM golang:1.23-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev vips-dev git
 
-# Install sqlc
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+# Install sqlc — pinned to v1.27.0, last release that builds on Go 1.23.
+# Newer sqlc (v1.31+) requires Go 1.26+. Bump both together when upgrading.
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0
 
 WORKDIR /app
 COPY go.mod ./
