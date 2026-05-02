@@ -20,7 +20,7 @@ deploy/shared/
 
 ```bash
 docker network create proxy
-cd ~/daugia999/deploy/shared
+cd ~/daugia/deploy/shared
 docker compose up -d
 ```
 
@@ -58,7 +58,7 @@ docker compose up -d
 4. **Reload Caddy** (no restart, no downtime for other sites):
 
    ```bash
-   cd ~/daugia999/deploy/shared
+   cd ~/daugia/deploy/shared
    docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
    ```
 
@@ -145,8 +145,8 @@ Past that, resize to HYPER-3 (4 vCPU / 8 GB / 80 GB, ~306K/mo annual).
 
 ```bash
 cd ~/myblog && docker compose down
-rm ~/daugia999/deploy/shared/conf.d/blog.example.com.caddy
-docker compose -f ~/daugia999/deploy/shared/docker-compose.yml exec caddy \
+rm ~/daugia/deploy/shared/conf.d/blog.example.com.caddy
+docker compose -f ~/daugia/deploy/shared/docker-compose.yml exec caddy \
   caddy reload --config /etc/caddy/Caddyfile
 ```
 

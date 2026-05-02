@@ -1,6 +1,6 @@
 # Deploy: HyperCore NVMe VPS HYPER-2 + Object Storage
 
-Single-VM deployment for the **daugia999** Go API.
+Single-VM deployment for the **ĐẤUGIÁ** Go API ([github.com/tthandb/daugia](https://github.com/tthandb/daugia), branch `new-dau-gia`).
 
 - **VPS**: HyperCore NVMe VPS HYPER-2 — 2 vCPU / 4 GB / 40 GB NVMe / 200 Mbps unlimited
 - **Region**: Ho Chi Minh 2
@@ -67,8 +67,8 @@ Log out, back in as `daugia`.
 
 ```bash
 ssh daugia@<HYPERCORE_IP>
-git clone https://github.com/<your-org>/daugia999.git
-cd daugia999/deploy/hypercore
+git clone --branch new-dau-gia https://github.com/tthandb/daugia.git
+cd daugia/deploy/hypercore
 
 cp .env.example .env
 chmod 600 .env
@@ -88,7 +88,7 @@ mkdir -p data/postgres
 # Create the shared docker network all public-facing services join
 docker network create proxy
 
-cd ~/daugia999/deploy/shared
+cd ~/daugia/deploy/shared
 mkdir -p data config
 docker compose up -d
 docker compose logs -f caddy
@@ -101,7 +101,7 @@ first request.
 ### 7. Boot daugia
 
 ```bash
-cd ~/daugia999/deploy/hypercore
+cd ~/daugia/deploy/hypercore
 docker compose up -d
 docker compose logs -f api
 ```
@@ -139,14 +139,14 @@ aws configure --profile r2  # paste OBJECT_STORAGE_ACCESS_KEY / SECRET_KEY
 
 # Cron at 03:00 ICT daily
 crontab -e
-# 0 3 * * * /home/daugia/daugia999/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
+# 0 3 * * * /home/daugia/daugia/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
 ```
 
 ## Day-to-day
 
 ```bash
 # Deploy new backend code
-cd ~/daugia999 && git pull
+cd ~/daugia && git pull origin new-dau-gia
 cd deploy/hypercore
 docker compose build api
 docker compose up -d api
