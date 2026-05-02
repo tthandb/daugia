@@ -14,14 +14,18 @@ import (
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
+	"github.com/daugia999/backend/internal/imageopt"
 )
 
-// ProxyThumbnail serves thumbnail images from MinIO
+// ProxyThumbnail serves thumbnail images from object storage. The content
+// type is sniffed from the file's magic bytes — historically the upload
+// path stored JPEG bytes labeled as image/webp, so we cannot trust the
+// extension or stored mime. This makes Vercel's Image optimizer (and any
+// CDN) re-encode them correctly.
 func (h *Handler) ProxyThumbnail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	// Look up actual thumbnail key from DB
 	article, err := h.queries.GetArticleByID(ctx, id)
 	if err != nil || article.ThumbnailKey == nil {
 		writeError(w, 404, "thumbnail not found")
@@ -41,13 +45,32 @@ func (h *Handler) ProxyThumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "image/webp")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	// Sniff the first 12 bytes for the real MIME, then concatenate them with
+	// the rest of the body. Cheap; avoids buffering the whole image.
+	head := make([]byte, 12)
+	n, _ := io.ReadFull(obj, head)
+	mime := imageopt.SniffMime(head[:n])
+	if mime == "application/octet-stream" {
+		mime = "image/webp" // last-resort fallback for files that begin past the magic-byte window
+	}
+
+	w.Header().Set("Content-Type", mime)
+	// Public, long-lived: thumbnails are immutable per article ID. Vercel
+	// edge will cache; admins refresh by re-uploading (which mints a new key).
+	w.Header().Set("Cache-Control", "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400")
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))
-	io.Copy(w, obj)
+	if r.Method == http.MethodHead {
+		return
+	}
+	if _, err := w.Write(head[:n]); err != nil {
+		return
+	}
+	_, _ = io.Copy(w, obj)
 }
 
-// ProxyImage serves gallery images from MinIO
+// ProxyImage serves gallery images from object storage. Same MIME sniffing
+// as ProxyThumbnail; gallery files are also keyed by CUID so the immutable
+// cache directive is safe.
 func (h *Handler) ProxyImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
@@ -71,11 +94,25 @@ func (h *Handler) ProxyImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "image/webp")
+	head := make([]byte, 12)
+	n, _ := io.ReadFull(obj, head)
+	mime := imageopt.SniffMime(head[:n])
+	if mime == "application/octet-stream" {
+		mime = "image/webp"
+	}
+
+	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))
-	io.Copy(w, obj)
+	if r.Method == http.MethodHead {
+		return
+	}
+	if _, err := w.Write(head[:n]); err != nil {
+		return
+	}
+	_, _ = io.Copy(w, obj)
 }
+
 
 // DownloadAttachment redirects to a presigned URL for the attachment
 func (h *Handler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
@@ -139,14 +176,32 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 		f.Close()
 		file.Close()
 
-		// TODO: bimg processing — for now upload as-is
-		// In production: bimg optimize to webp, max 1600px wide
 		imageID := cuid.New()
 		key := fmt.Sprintf("images/%s/%s.webp", articleID, imageID)
 
-		uploadFile, _ := os.Open(tmpFile)
+		// Optimize to WebP at q=75, max 1600px long edge via vipsthumbnail.
+		// Falls back to uploading the original bytes if vips-tools is not
+		// installed (dev environments) — never fail the upload over format.
+		var (
+			uploadPath  string
+			uploadMime  string
+			imgWidth    int32
+			imgHeight   int32
+		)
+		optPath := filepath.Join(tmpDir, imageID+".webp")
+		if w, h, err := imageopt.OptimizeWebP(tmpFile, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
+			uploadPath = optPath
+			uploadMime = "image/webp"
+			imgWidth = int32(w)
+			imgHeight = int32(h)
+		} else {
+			uploadPath = tmpFile
+			uploadMime = mime
+		}
+
+		uploadFile, _ := os.Open(uploadPath)
 		stat, _ := uploadFile.Stat()
-		_ = h.store.Upload(ctx, key, uploadFile, stat.Size(), "image/webp")
+		_ = h.store.Upload(ctx, key, uploadFile, stat.Size(), uploadMime)
 		uploadFile.Close()
 
 		sortOrder++
@@ -156,8 +211,8 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 			FileKey:   key,
 			FileName:  fh.Filename,
 			AltText:   "",
-			Width:     0,
-			Height:    0,
+			Width:     imgWidth,
+			Height:    imgHeight,
 			SizeBytes: int32(stat.Size()),
 			SortOrder: sortOrder,
 		})

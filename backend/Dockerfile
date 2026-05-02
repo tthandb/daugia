@@ -26,6 +26,7 @@ RUN apk add --no-cache \
     nodejs npm \
     poppler-utils \
     vips \
+    vips-tools \
     && npm install -g mammoth \
     && npm cache clean --force \
     && curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz \

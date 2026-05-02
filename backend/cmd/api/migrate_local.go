@@ -14,6 +14,7 @@ import (
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
+	"github.com/daugia999/backend/internal/imageopt"
 	"github.com/daugia999/backend/internal/parser"
 	"github.com/daugia999/backend/internal/storage"
 )
@@ -125,17 +126,32 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 		slugPrefix := slugTimestampRe.ReplaceAllString(nameNoExt, "")
 		for prefix, imgPath := range imageMap {
 			if strings.HasPrefix(slugPrefix, prefix) || strings.HasPrefix(prefix, slugPrefix) {
-				// Upload thumbnail to MinIO — use slug for readable filenames
 				tKey := fmt.Sprintf("thumbs/%s.webp", slug)
-				imgFile, err := os.Open(imgPath)
+
+				// Re-encode the legacy JPEG/PNG to WebP at q=75, max 1600px,
+				// strip EXIF. Keeps the same key so existing references work.
+				// Falls back to uploading the original if vipsthumbnail isn't
+				// installed (dev environments).
+				tmpDir, _ := os.MkdirTemp("", "thumb-*")
+				optPath := filepath.Join(tmpDir, slug+".webp")
+				uploadPath := imgPath
+				uploadMime := "image/jpeg"
+				if _, _, err := imageopt.OptimizeWebP(imgPath, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
+					uploadPath = optPath
+					uploadMime = "image/webp"
+				}
+
+				imgFile, err := os.Open(uploadPath)
 				if err == nil {
 					imgStat, _ := imgFile.Stat()
-					if err := store.Upload(ctx, tKey, imgFile, imgStat.Size(), "image/jpeg"); err == nil {
+					if err := store.Upload(ctx, tKey, imgFile, imgStat.Size(), uploadMime); err == nil {
 						thumbnailKey = &tKey
-						fmt.Printf("  matched thumbnail: %s\n", filepath.Base(imgPath))
+						fmt.Printf("  matched thumbnail: %s -> %s (%d bytes)\n",
+							filepath.Base(imgPath), uploadMime, imgStat.Size())
 					}
 					imgFile.Close()
 				}
+				os.RemoveAll(tmpDir)
 				break
 			}
 		}

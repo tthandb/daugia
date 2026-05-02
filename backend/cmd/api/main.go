@@ -37,6 +37,9 @@ func main() {
 		case "migrate-local":
 			runMigrateLocal()
 			return
+		case "reoptimize-thumbs":
+			runReoptimizeThumbs()
+			return
 		}
 	}
 
