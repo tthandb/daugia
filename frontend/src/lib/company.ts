@@ -21,6 +21,22 @@ export const COMPANY = {
     countryCode: "VN",
     full: "Sn 24 Ngô Quyền, phường Vĩnh Phúc, tỉnh Phú Thọ, Việt Nam",
   },
+  // Approximate coordinates of "Sn 24 Ngô Quyền, Vĩnh Yên / Vĩnh Phúc / Phú Thọ".
+  // Refine via Google My Business once verified.
+  geo: {
+    latitude: 21.30957,
+    longitude: 105.60686,
+  },
+  // Mon–Fri 08:00–17:00 (Vietnamese standard office hours).
+  openingHours: [
+    { days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "17:00" },
+  ],
+  // Off-site identity references — populate as profiles are claimed.
+  sameAs: [
+    `https://masothue.com/${"2500634576"}-cong-ty-dau-gia-hop-danh-vinh-yen`,
+  ],
+  // Service areas — narrower than 'VN' country-wide, more useful to local search.
+  serviceAreas: ["tỉnh Phú Thọ", "tỉnh Vĩnh Phúc"],
   ids: {
     organization: `${SITE_URL}/#organization`,
     website: `${SITE_URL}/#website`,

@@ -4,10 +4,23 @@ import { serverFetch } from "@/lib/api";
 import type { Article, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
+import { COMPANY } from "@/lib/company";
 
 export const metadata: Metadata = {
   title: "Tìm Kiếm",
   description: "Tìm kiếm bài viết nghiên cứu thị trường đấu giá bất động sản",
+  alternates: { canonical: "/search" },
+  // Search-result pages should not be indexed — they create endless duplicate
+  // listings keyed on user query and dilute the canonical /articles equity.
+  robots: { index: false, follow: true },
+  openGraph: {
+    url: `${COMPANY.url}/search`,
+    title: `Tìm Kiếm | ${COMPANY.shortName}`,
+    description: "Tìm kiếm bài viết nghiên cứu thị trường đấu giá bất động sản",
+    siteName: COMPANY.legalName,
+    locale: "vi_VN",
+    type: "website",
+  },
 };
 
 interface SearchPageProps {

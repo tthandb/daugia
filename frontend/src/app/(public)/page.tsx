@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { serverFetch } from "@/lib/api";
+import { publicFetch } from "@/lib/api";
 import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { COMPANY } from "@/lib/company";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: {
@@ -18,12 +20,22 @@ export const metadata: Metadata = {
     url: COMPANY.url,
     title: COMPANY.legalName,
     description: `${COMPANY.tagline} — ${COMPANY.legalName}.`,
+    siteName: COMPANY.legalName,
+    locale: "vi_VN",
+    type: "website",
+    images: [{ url: `${COMPANY.url}/opengraph-image`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: COMPANY.legalName,
+    description: `${COMPANY.tagline} — ${COMPANY.legalName}.`,
+    images: [`${COMPANY.url}/opengraph-image`],
   },
 };
 
 async function getFeaturedArticles() {
   try {
-    const res = await serverFetch<{ data: Article[] }>(
+    const res = await publicFetch<{ data: Article[] }>(
       "/api/articles/featured?limit=3"
     );
     return res.data;
@@ -34,7 +46,7 @@ async function getFeaturedArticles() {
 
 async function getLatestArticles() {
   try {
-    const res = await serverFetch<PaginatedResponse<Article>>(
+    const res = await publicFetch<PaginatedResponse<Article>>(
       "/api/articles?per_page=6"
     );
     return res.data;
@@ -45,7 +57,7 @@ async function getLatestArticles() {
 
 async function getCategories() {
   try {
-    const res = await serverFetch<{ data: Category[] }>("/api/categories");
+    const res = await publicFetch<{ data: Category[] }>("/api/categories");
     return res.data;
   } catch {
     return [];
@@ -130,7 +142,7 @@ export default async function HomePage() {
               {categories.map((cat) => (
                 <Link
                   key={cat.id}
-                  href={`/articles?category=${cat.slug}`}
+                  href={`/categories/${cat.slug}`}
                   className="inline-flex items-center rounded-full border border-warm-border bg-white px-5 py-2 font-body text-sm font-medium text-charcoal transition-all hover:-translate-y-0.5 hover:border-gold hover:text-gold hover:shadow-sm"
                 >
                   <span

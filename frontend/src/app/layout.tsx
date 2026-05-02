@@ -33,16 +33,39 @@ export const metadata: Metadata = {
     siteName: COMPANY.legalName,
     title: COMPANY.legalName,
     description: `${COMPANY.tagline} — ${COMPANY.legalName}.`,
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: COMPANY.legalName,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: COMPANY.legalName,
     description: `${COMPANY.tagline} — ${COMPANY.legalName}.`,
+    images: ["/twitter-image"],
   },
   robots: {
     index: true,
     follow: true,
     googleBot: { index: true, follow: true },
+  },
+  // Search-console verification — populate via env so each console can be
+  // verified without code changes. Empty values are simply omitted by Next.
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION,
+    yandex: process.env.YANDEX_VERIFICATION,
+    other: {
+      ...(process.env.BING_SITE_VERIFICATION && {
+        "msvalidate.01": process.env.BING_SITE_VERIFICATION,
+      }),
+      ...(process.env.COCCOC_VERIFICATION && {
+        "coccoc-verification": process.env.COCCOC_VERIFICATION,
+      }),
+    },
   },
 };
 

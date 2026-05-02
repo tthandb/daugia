@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { serverFetch } from "@/lib/api";
+import { permanentRedirect } from "next/navigation";
+import { publicFetch } from "@/lib/api";
 import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { CategoryFilter } from "@/components/category-filter";
 import { Pagination } from "@/components/pagination";
 import { COMPANY } from "@/lib/company";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Thư Viện Nghiên Cứu",
@@ -13,6 +16,17 @@ export const metadata: Metadata = {
   openGraph: {
     url: `${COMPANY.url}/articles`,
     title: `Thư Viện Nghiên Cứu | ${COMPANY.shortName}`,
+    description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.address.region}.`,
+    siteName: COMPANY.legalName,
+    locale: "vi_VN",
+    type: "website",
+    images: [{ url: `${COMPANY.url}/opengraph-image`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `Thư Viện Nghiên Cứu | ${COMPANY.shortName}`,
+    description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.address.region}.`,
+    images: [`${COMPANY.url}/opengraph-image`],
   },
 };
 
@@ -26,7 +40,7 @@ interface ArticlesPageProps {
 
 async function getCategories() {
   try {
-    const res = await serverFetch<{ data: Category[] }>("/api/categories");
+    const res = await publicFetch<{ data: Category[] }>("/api/categories");
     return res.data;
   } catch {
     return [];
@@ -35,7 +49,7 @@ async function getCategories() {
 
 async function getArticles(params: Record<string, string>) {
   try {
-    const res = await serverFetch<PaginatedResponse<Article>>("/api/articles", {
+    const res = await publicFetch<PaginatedResponse<Article>>("/api/articles", {
       params,
     });
     return res;
@@ -49,11 +63,17 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   const category = searchParams.category || "";
   const province = searchParams.province || "";
 
+  // Permanently redirect ?category= to the SEO-friendly path-based route so
+  // every category landing has its own canonical, title, and description.
+  if (category) {
+    const target = `/categories/${category}${page !== "1" ? `?page=${page}` : ""}`;
+    permanentRedirect(target);
+  }
+
   const fetchParams: Record<string, string> = {
     page,
     per_page: "12",
   };
-  if (category) fetchParams.category = category;
   if (province) fetchParams.province = province;
 
   const [categories, articles] = await Promise.all([

@@ -36,7 +36,7 @@ export function CategoryFilter({ categories, activeSlug }: CategoryFilterProps) 
         return (
           <Link
             key={category.id}
-            href={`/articles?category=${category.slug}`}
+            href={`/categories/${category.slug}`}
             className={cn(
               "inline-flex shrink-0 items-center rounded-full px-4 py-2 font-body text-sm font-medium transition-colors",
               isActive

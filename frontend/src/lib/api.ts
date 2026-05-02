@@ -36,14 +36,35 @@ async function parseJsonOrEmpty<T>(res: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-// Server-side fetch (includes cookies for auth)
+// Server-side fetch — used by RSC pages. Defaults to no-store so admin pages
+// always see fresh data; public pages should pass `next: { revalidate: N }`
+// (or rely on the route segment's `export const revalidate`) so Vercel's edge
+// can cache the rendered HTML between regenerations.
 export async function serverFetch<T>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
+  // Honour the caller's cache directive when provided; otherwise opt into
+  // ISR via `next.revalidate` if the caller passed one, else fall back to
+  // no-store so behaviour stays correct in admin-only callers.
+  const hasCacheHint =
+    options.cache !== undefined ||
+    (options as { next?: { revalidate?: number } }).next?.revalidate !== undefined;
   return apiFetch<T>(path, {
     ...options,
-    cache: "no-store",
+    ...(hasCacheHint ? {} : { cache: "no-store" }),
+  });
+}
+
+// Convenience helper for public pages — opts into ISR with the supplied TTL.
+export async function publicFetch<T>(
+  path: string,
+  options: FetchOptions = {},
+  revalidateSeconds = 300,
+): Promise<T> {
+  return apiFetch<T>(path, {
+    ...options,
+    next: { revalidate: revalidateSeconds, ...(options as { next?: object }).next },
   });
 }
 
@@ -81,6 +102,8 @@ export interface Article {
   title: string;
   slug: string;
   description: string;
+  /** Hand-written meta description for SEO + Article schema. Optional. */
+  metaDescription?: string | null;
   authorName: string;
   contentHtml?: string;
   status: string;
@@ -105,6 +128,13 @@ export interface Article {
   rank?: number;
   createdAt: string;
   updatedAt: string;
+  // Auction event fields — populated when admin fills them; drive Event JSON-LD.
+  auctionStart?: string | null;
+  auctionEnd?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  startingPrice?: number | null;
+  depositAmount?: number | null;
 }
 
 export interface Category {

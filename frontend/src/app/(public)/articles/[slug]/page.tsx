@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Eye, Calendar, User, FileText, Paperclip } from "lucide-react";
-import { serverFetch } from "@/lib/api";
+import { notFound } from "next/navigation";
+import { Download, Eye, Calendar, User, FileText, Paperclip, MapPin, Clock, Wallet } from "lucide-react";
+import { publicFetch } from "@/lib/api";
 import type { Article } from "@/lib/api";
 import { formatDate, formatFileSize } from "@/lib/utils";
 import { ViewTracker } from "@/components/view-tracker";
 import { COMPANY } from "@/lib/company";
 
-export const revalidate = 60;
+// ISR: regenerate at most every 5 min so Vercel edge caches the rendered HTML
+// instead of hitting the HCM 2 origin on every request.
+export const revalidate = 300;
 
 interface ArticlePageProps {
   params: { slug: string };
@@ -15,7 +18,7 @@ interface ArticlePageProps {
 
 async function getArticle(slug: string): Promise<Article | null> {
   try {
-    const res = await serverFetch<{ data: Article }>(`/api/articles/${slug}`);
+    const res = await publicFetch<{ data: Article }>(`/api/articles/${slug}`);
     return res.data;
   } catch {
     return null;
@@ -28,7 +31,7 @@ async function getRelatedArticles(
 ): Promise<Article[]> {
   if (!categorySlug) return [];
   try {
-    const res = await serverFetch<{ data: Article[] }>(
+    const res = await publicFetch<{ data: Article[] }>(
       `/api/articles?category=${categorySlug}&per_page=3`
     );
     return (res.data || []).filter((a) => a.id !== excludeId).slice(0, 3);
@@ -39,7 +42,7 @@ async function getRelatedArticles(
 
 async function getSitemapSlugs(): Promise<{ slug: string }[]> {
   try {
-    const res = await serverFetch<{ data: { slug: string }[] }>("/api/sitemap");
+    const res = await publicFetch<{ data: { slug: string }[] }>("/api/sitemap");
     return res.data;
   } catch {
     return [];
@@ -51,23 +54,43 @@ export async function generateStaticParams() {
   return slugs.map((item) => ({ slug: item.slug }));
 }
 
+function absoluteImageUrl(thumbnailUrl: string | null | undefined): string | null {
+  if (!thumbnailUrl) return null;
+  if (thumbnailUrl.startsWith("http")) return thumbnailUrl;
+  return `${COMPANY.url}${thumbnailUrl.startsWith("/") ? "" : "/"}${thumbnailUrl}`;
+}
+
+/**
+ * Prefer admin-written metaDescription; fall back to auto-clipped description.
+ * The fallback is fine for legacy rows but reads as broken in SERP — admins
+ * should fill metaDescription whenever they edit an article.
+ */
+function descriptionFor(article: Article): string {
+  return (article.metaDescription && article.metaDescription.trim()) || article.description;
+}
+
 export async function generateMetadata({
   params,
 }: ArticlePageProps): Promise<Metadata> {
   const article = await getArticle(params.slug);
   if (!article) {
-    return { title: "Bài viết không tồn tại" };
+    return {
+      title: "Bài viết không tồn tại",
+      robots: { index: false, follow: false },
+    };
   }
 
   const canonical = `/articles/${article.slug}`;
+  const ogImage = absoluteImageUrl(article.thumbnailUrl) || `${COMPANY.url}/opengraph-image`;
+  const description = descriptionFor(article);
 
   return {
     title: article.title,
-    description: article.description,
+    description,
     alternates: { canonical },
     openGraph: {
       title: article.title,
-      description: article.description,
+      description,
       type: "article",
       locale: "vi_VN",
       url: `${COMPANY.url}${canonical}`,
@@ -75,15 +98,13 @@ export async function generateMetadata({
       publishedTime: article.publishedAt || undefined,
       modifiedTime: article.updatedAt || undefined,
       authors: [article.authorName],
-      ...(article.thumbnailUrl && {
-        images: [{ url: article.thumbnailUrl, width: 800, height: 450 }],
-      }),
+      images: [{ url: ogImage, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
       title: article.title,
-      description: article.description,
-      ...(article.thumbnailUrl && { images: [article.thumbnailUrl] }),
+      description,
+      images: [ogImage],
     },
   };
 }
@@ -146,22 +167,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const article = await getArticle(params.slug);
 
   if (!article) {
-    return (
-      <div className="container-wide py-20 text-center">
-        <h1 className="font-heading text-3xl font-bold text-charcoal">
-          Bài viết không tồn tại
-        </h1>
-        <p className="mt-4 font-body text-muted-fg">
-          Bài viết bạn tìm kiếm không tồn tại hoặc đã bị xóa.
-        </p>
-        <Link
-          href="/articles"
-          className="mt-6 inline-block font-body text-sm font-medium text-gold hover:text-gold-light"
-        >
-          Quay lại thư viện
-        </Link>
-      </div>
-    );
+    notFound();
   }
 
   const related = await getRelatedArticles(article.categorySlug, article.id);
@@ -177,8 +183,10 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const attachments = article.attachments || [];
   const tags = article.tags || [];
 
-  // JSON-LD structured data — Article + BreadcrumbList graph
+  // JSON-LD structured data — Article + BreadcrumbList graph (+ Event when set)
   const articleUrl = `${COMPANY.url}/articles/${article.slug}`;
+  const articleImageAbs = absoluteImageUrl(article.thumbnailUrl);
+  const articleDescription = descriptionFor(article);
 
   const breadcrumbItems: { name: string; item: string }[] = [
     { name: "Trang Chủ", item: COMPANY.url },
@@ -187,10 +195,60 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   if (article.categoryName && article.categorySlug) {
     breadcrumbItems.push({
       name: article.categoryName,
-      item: `${COMPANY.url}/articles?category=${article.categorySlug}`,
+      item: `${COMPANY.url}/categories/${article.categorySlug}`,
     });
   }
   breadcrumbItems.push({ name: article.title, item: articleUrl });
+
+  // Event node — only emitted when an auctionStart timestamp exists. Required
+  // Event fields are name + startDate + location + (eventAttendanceMode for
+  // offline). We compose location from venueName + venueAddress if either is
+  // set; otherwise fall back to a Place describing the company office.
+  const auctionEvent =
+    article.auctionStart
+      ? {
+          "@type": "Event",
+          "@id": `${articleUrl}#auction`,
+          name: article.title,
+          description: articleDescription,
+          startDate: article.auctionStart,
+          ...(article.auctionEnd && { endDate: article.auctionEnd }),
+          eventStatus: "https://schema.org/EventScheduled",
+          eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+          inLanguage: "vi-VN",
+          location: {
+            "@type": "Place",
+            name: article.venueName || COMPANY.legalName,
+            address: {
+              "@type": "PostalAddress",
+              ...(article.venueAddress
+                ? { streetAddress: article.venueAddress }
+                : {
+                    streetAddress: COMPANY.address.street,
+                    addressLocality: COMPANY.address.locality,
+                  }),
+              addressRegion: article.province || COMPANY.address.region,
+              addressCountry: COMPANY.address.countryCode,
+            },
+          },
+          ...(article.startingPrice && {
+            offers: {
+              "@type": "Offer",
+              price: String(article.startingPrice),
+              priceCurrency: "VND",
+              availability: "https://schema.org/InStock",
+              url: articleUrl,
+              ...(article.publishedAt && { validFrom: article.publishedAt }),
+              ...(article.depositAmount && {
+                category: `Đặt cọc: ${article.depositAmount.toLocaleString("vi-VN")} VND`,
+              }),
+            },
+          }),
+          organizer: { "@id": COMPANY.ids.organization },
+          ...(articleImageAbs && { image: articleImageAbs }),
+          url: articleUrl,
+        }
+      : null;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -200,13 +258,13 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
         "@id": `${articleUrl}#article`,
         mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
         headline: article.title,
-        description: article.description,
+        description: articleDescription,
         inLanguage: "vi-VN",
         author: { "@type": "Person", name: article.authorName },
         datePublished: article.publishedAt,
         dateModified: article.updatedAt,
         publisher: { "@id": COMPANY.ids.organization },
-        ...(article.thumbnailUrl && { image: article.thumbnailUrl }),
+        ...(articleImageAbs && { image: articleImageAbs }),
       },
       {
         "@type": "BreadcrumbList",
@@ -217,6 +275,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           item: item.item,
         })),
       },
+      ...(auctionEvent ? [auctionEvent] : []),
     ],
   };
 
@@ -260,9 +319,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
             {/* Article header */}
             <header className="mb-8">
               {/* Category badge */}
-              {article.categoryName && (
+              {article.categoryName && article.categorySlug && (
                 <Link
-                  href={`/articles?category=${article.categorySlug}`}
+                  href={`/categories/${article.categorySlug}`}
                   className="inline-block rounded-full px-3 py-1 font-body text-xs font-semibold text-white transition-opacity hover:opacity-80"
                   style={{
                     backgroundColor: article.categoryColor || "#A16207",
@@ -317,6 +376,76 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                     </span>
                   )}
                 </div>
+              )}
+
+              {/* Auction details — visible block matching the Event JSON-LD.
+                  Google requires that structured data describes content the
+                  user can actually see on the page. */}
+              {article.auctionStart && (
+                <aside className="mt-6 rounded-lg border border-gold/40 bg-gold-pale/40 p-5">
+                  <h2 className="font-heading text-lg font-bold text-charcoal">
+                    Thông Tin Cuộc Đấu Giá
+                  </h2>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-start gap-2">
+                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                      <div>
+                        <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
+                          Thời gian
+                        </dt>
+                        <dd className="font-body text-sm font-medium text-charcoal">
+                          {formatDate(article.auctionStart)}
+                          {article.auctionEnd && (
+                            <> – {formatDate(article.auctionEnd)}</>
+                          )}
+                        </dd>
+                      </div>
+                    </div>
+                    {(article.venueName || article.venueAddress) && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                        <div>
+                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
+                            Địa điểm
+                          </dt>
+                          <dd className="font-body text-sm font-medium text-charcoal">
+                            {article.venueName}
+                            {article.venueName && article.venueAddress && (
+                              <>, </>
+                            )}
+                            {article.venueAddress}
+                          </dd>
+                        </div>
+                      </div>
+                    )}
+                    {article.startingPrice != null && (
+                      <div className="flex items-start gap-2">
+                        <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                        <div>
+                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
+                            Giá khởi điểm
+                          </dt>
+                          <dd className="font-body text-sm font-medium text-charcoal">
+                            {article.startingPrice.toLocaleString("vi-VN")} VND
+                          </dd>
+                        </div>
+                      </div>
+                    )}
+                    {article.depositAmount != null && (
+                      <div className="flex items-start gap-2">
+                        <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                        <div>
+                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
+                            Tiền đặt trước
+                          </dt>
+                          <dd className="font-body text-sm font-medium text-charcoal">
+                            {article.depositAmount.toLocaleString("vi-VN")} VND
+                          </dd>
+                        </div>
+                      </div>
+                    )}
+                  </dl>
+                </aside>
               )}
             </header>
 

@@ -5,7 +5,7 @@ export function OrganizationJsonLd() {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "LocalBusiness",
+        "@type": ["LocalBusiness", "ProfessionalService"],
         "@id": COMPANY.ids.organization,
         name: COMPANY.legalName,
         legalName: COMPANY.legalNameUpper,
@@ -16,7 +16,12 @@ export function OrganizationJsonLd() {
         telephone: COMPANY.phoneTel,
         taxID: COMPANY.taxId,
         foundingDate: COMPANY.founded,
-        founder: { "@type": "Person", name: COMPANY.representative },
+        founder: {
+          "@type": "Person",
+          name: COMPANY.representative,
+          jobTitle: "Giám đốc",
+          worksFor: { "@id": COMPANY.ids.organization },
+        },
         address: {
           "@type": "PostalAddress",
           streetAddress: COMPANY.address.street,
@@ -24,13 +29,31 @@ export function OrganizationJsonLd() {
           addressRegion: COMPANY.address.region,
           addressCountry: COMPANY.address.countryCode,
         },
-        areaServed: { "@type": "Country", name: COMPANY.address.countryName },
+        geo: {
+          "@type": "GeoCoordinates",
+          latitude: COMPANY.geo.latitude,
+          longitude: COMPANY.geo.longitude,
+        },
+        areaServed: COMPANY.serviceAreas.map((name) => ({
+          "@type": "AdministrativeArea",
+          name,
+        })),
+        openingHoursSpecification: COMPANY.openingHours.map((spec) => ({
+          "@type": "OpeningHoursSpecification",
+          dayOfWeek: spec.days,
+          opens: spec.opens,
+          closes: spec.closes,
+        })),
+        sameAs: COMPANY.sameAs,
         hasMap: mapsSearchUrl(),
         additionalType: "https://en.wikipedia.org/wiki/Auction_house",
         knowsAbout: [
           "Đấu giá bất động sản",
           "Bất động sản Phú Thọ",
           "Đấu giá tài sản",
+          "Đấu giá quyền sử dụng đất",
+          "Đấu giá tài sản thi hành án",
+          "Luật Đấu giá tài sản 2016",
         ],
       },
       {

@@ -35,6 +35,28 @@ const tabs: { label: string; value: Tab }[] = [
   { label: "Xuất Bản", value: "publish" },
 ];
 
+// API returns ISO timestamps (with Z); <input type="datetime-local"> wants
+// the local-clock format YYYY-MM-DDTHH:mm. Strip seconds + tz, keep clock value.
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+// Inverse: take the local-clock string back to ISO so the API receives a
+// well-formed timestamptz. Empty string → null (clears the column on save).
+function fromLocalInput(local: string): string | null {
+  if (!local) return null;
+  const d = new Date(local);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 export default function EditArticlePage() {
   const params = useParams();
   const router = useRouter();
@@ -52,6 +74,7 @@ export default function EditArticlePage() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
   const [authorName, setAuthorName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [province, setProvince] = useState("");
@@ -60,6 +83,15 @@ export default function EditArticlePage() {
   const [assetType, setAssetType] = useState("");
   const [plotCount, setPlotCount] = useState("");
   const [totalArea, setTotalArea] = useState("");
+
+  // Auction Event state — drives Event JSON-LD on the public article page.
+  // All optional; when empty no Event schema is emitted.
+  const [auctionStart, setAuctionStart] = useState(""); // datetime-local format
+  const [auctionEnd, setAuctionEnd] = useState("");
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [startingPrice, setStartingPrice] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
 
   // Image state
   const [images, setImages] = useState<ArticleImage[]>([]);
@@ -90,6 +122,7 @@ export default function EditArticlePage() {
       setTitle(articleData.title);
       setSlug(articleData.slug);
       setDescription(articleData.description || "");
+      setMetaDescription(articleData.metaDescription || "");
       setAuthorName(articleData.authorName);
       setCategoryId(articleData.categoryId || "");
       setProvince(articleData.province || "");
@@ -98,6 +131,13 @@ export default function EditArticlePage() {
       setAssetType(articleData.assetType || "");
       setPlotCount(articleData.plotCount?.toString() || "");
       setTotalArea(articleData.totalArea || "");
+      // datetime-local input wants "YYYY-MM-DDTHH:mm" — strip seconds/Z/tz.
+      setAuctionStart(toLocalInput(articleData.auctionStart));
+      setAuctionEnd(toLocalInput(articleData.auctionEnd));
+      setVenueName(articleData.venueName || "");
+      setVenueAddress(articleData.venueAddress || "");
+      setStartingPrice(articleData.startingPrice?.toString() || "");
+      setDepositAmount(articleData.depositAmount?.toString() || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tải bài viết");
     } finally {
@@ -125,6 +165,7 @@ export default function EditArticlePage() {
           title: title.trim(),
           slug: slug.trim(),
           description: description.trim(),
+          metaDescription: metaDescription.trim() || null,
           authorName: authorName.trim(),
           categoryId: categoryId || null,
           province: province.trim() || null,
@@ -133,6 +174,12 @@ export default function EditArticlePage() {
           assetType: assetType.trim() || null,
           plotCount: plotCount ? parseInt(plotCount, 10) : null,
           totalArea: totalArea.trim() || null,
+          auctionStart: fromLocalInput(auctionStart),
+          auctionEnd: fromLocalInput(auctionEnd),
+          venueName: venueName.trim() || null,
+          venueAddress: venueAddress.trim() || null,
+          startingPrice: startingPrice ? parseInt(startingPrice, 10) : null,
+          depositAmount: depositAmount ? parseInt(depositAmount, 10) : null,
         }),
       });
       showSuccess("Đã lưu thành công");
@@ -421,6 +468,30 @@ export default function EditArticlePage() {
                   className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
                 />
               </div>
+              <div>
+                <label className="mb-1.5 flex items-center justify-between font-body text-sm font-medium text-fg">
+                  <span>
+                    Meta Description{" "}
+                    <span className="font-normal text-muted-fg">(SEO — hiển thị trong kết quả Google)</span>
+                  </span>
+                  <span
+                    className={cn(
+                      "font-mono text-xs",
+                      metaDescription.length > 160 ? "text-red-600" : "text-muted-fg"
+                    )}
+                  >
+                    {metaDescription.length} / 160
+                  </span>
+                </label>
+                <textarea
+                  value={metaDescription}
+                  onChange={(e) => setMetaDescription(e.target.value)}
+                  rows={2}
+                  maxLength={300}
+                  placeholder="Câu mô tả ngắn gọn 150–160 ký tự cho SERP. Để trống sẽ dùng tự động từ nội dung."
+                  className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1.5 block font-body text-sm font-medium text-fg">
@@ -531,6 +602,98 @@ export default function EditArticlePage() {
                     value={totalArea}
                     onChange={(e) => setTotalArea(e.target.value)}
                     placeholder="3.721m²"
+                    className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Auction Event details — feeds Schema.org Event JSON-LD */}
+          <div className="rounded-lg border border-warm-border bg-white p-6">
+            <h2 className="mb-1 font-heading text-lg font-semibold text-charcoal">
+              Thông Tin Cuộc Đấu Giá
+            </h2>
+            <p className="mb-4 font-body text-xs text-muted-fg">
+              Khi điền đủ thời gian + địa điểm, trang công khai sẽ hiển thị
+              khối thông tin đấu giá và xuất schema Event để Google hiển thị
+              ngày giờ trực tiếp trong kết quả tìm kiếm.
+            </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                    Thời gian bắt đầu
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={auctionStart}
+                    onChange={(e) => setAuctionStart(e.target.value)}
+                    className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                    Thời gian kết thúc
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={auctionEnd}
+                    onChange={(e) => setAuctionEnd(e.target.value)}
+                    className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                  Tên địa điểm
+                </label>
+                <input
+                  type="text"
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  placeholder="Hội trường UBND xã Hội Thịnh"
+                  className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                  Địa chỉ địa điểm
+                </label>
+                <input
+                  type="text"
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  placeholder="Thôn Trung, xã Hội Thịnh, tỉnh Phú Thọ"
+                  className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                    Giá khởi điểm (VND)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={startingPrice}
+                    onChange={(e) => setStartingPrice(e.target.value)}
+                    placeholder="1500000000"
+                    className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block font-body text-sm font-medium text-fg">
+                    Tiền đặt trước (VND)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="150000000"
                     className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
                   />
                 </div>
