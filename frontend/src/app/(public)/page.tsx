@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   description:
     `${COMPANY.legalName} — công bố thông báo đấu giá bất động sản, quyền sử dụng đất và tài sản ` +
-    `tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
+    `tại ${COMPANY.address.region}.`,
   alternates: { canonical: "/" },
   openGraph: {
     url: COMPANY.url,
@@ -86,7 +86,7 @@ export default async function HomePage() {
             <p className="mx-auto mt-6 max-w-xl font-body text-lg text-stone-400 leading-relaxed">
               Công bố các thông báo đấu giá bất động sản, quyền sử dụng đất,
               tài sản thi hành án và tài sản thanh lý tại{" "}
-              {COMPANY.address.region} và tỉnh Vĩnh Phúc.
+              {COMPANY.address.region}.
             </p>
             <Link
               href="/articles"

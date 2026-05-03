@@ -12,7 +12,7 @@
 - **Established**: 2019-09-04
 - **Contact**: 0912535999 | Representative: Nguyễn Văn Dương
 - **Type**: Joint-venture real estate auction company — public publisher of its own auction notices
-- **Audience**: General public, businesses, and other parties interested in participating in auctions in Phú Thọ / Vĩnh Phúc — Vietnamese-speaking. NOT a research portal for institutional investors.
+- **Audience**: General public, businesses, and other parties interested in participating in auctions in tỉnh Phú Thọ — Vietnamese-speaking. NOT a research portal for institutional investors. (Note: the former tỉnh Vĩnh Phúc was merged into tỉnh Phú Thọ in 2025; legacy article titles still reference Vĩnh Phúc and stay as historical record.)
 - **Language**: **Vietnamese** — all UI, labels, navigation, content
 - **UI References (visual aesthetic only — not positioning)**: realtor.com/research (clean, data-driven) + savills.com (premium editorial)
 - **Mockup**: `mockup.html` — 4-page interactive HTML mockup (Trang Chủ, Thư Viện, Chi Tiết Bài, Quản Trị)

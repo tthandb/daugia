@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**ĐẤUGIÁ** — Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (joint-venture real estate auction company operating in Phú Thọ and Vĩnh Phúc).
+**ĐẤUGIÁ** — Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (joint-venture real estate auction company operating in tỉnh Phú Thọ — which absorbed the former tỉnh Vĩnh Phúc in the 2025 administrative merger).
 
 **Company Details:**
 - **Name**: CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN
@@ -165,7 +165,7 @@ k8s/                         Kubernetes manifests (namespace, api, postgres, min
 
 **FTS**: PostgreSQL native — `search_vector tsvector` column with GIN index, auto-updated by trigger. Uses **`'simple'` dictionary** (Vietnamese has no PostgreSQL dictionary). Weights: A=title, B=description, C=contentPlain, D=authorName. Query via sqlc raw query with `ts_rank`.
 
-**Location metadata**: Articles have structured `province`/`district`/`ward` fields extracted from titles. Enables location-based filtering. Most articles are in Vĩnh Phúc province.
+**Location metadata**: Articles have structured `province`/`district`/`ward` fields extracted from titles. Enables location-based filtering. Older notices reference tỉnh Vĩnh Phúc (preserved as historical record); new notices use tỉnh Phú Thọ following the 2025 merger.
 
 **IDs**: All tables use `cuid()` generated in Go — URL-safe, no enumeration. Old Supabase `bigint` IDs preserved in `legacyId` field.
 

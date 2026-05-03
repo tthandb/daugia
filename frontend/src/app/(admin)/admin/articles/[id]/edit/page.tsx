@@ -539,7 +539,7 @@ export default function EditArticlePage() {
                     type="text"
                     value={province}
                     onChange={(e) => setProvince(e.target.value)}
-                    placeholder="Vĩnh Phúc"
+                    placeholder="Phú Thọ"
                     className="w-full rounded-md border border-warm-border px-3 py-2 font-body text-sm text-fg outline-none focus:border-gold focus:ring-1 focus:ring-gold"
                   />
                 </div>

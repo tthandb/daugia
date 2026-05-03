@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   description:
     `${COMPANY.legalName} — công bố thông báo đấu giá bất động sản, quyền sử dụng đất ` +
-    `và tài sản tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc. MST ${COMPANY.taxId}.`,
+    `và tài sản tại ${COMPANY.address.region}. MST ${COMPANY.taxId}.`,
   applicationName: COMPANY.legalName,
   authors: [{ name: COMPANY.legalName, url: COMPANY.url }],
   creator: COMPANY.legalName,

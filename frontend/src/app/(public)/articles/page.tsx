@@ -11,12 +11,12 @@ export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Thông Báo Đấu Giá",
-  description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
+  description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region}.`,
   alternates: { canonical: "/articles" },
   openGraph: {
     url: `${COMPANY.url}/articles`,
     title: `Thông Báo Đấu Giá | ${COMPANY.shortName}`,
-    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
+    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region}.`,
     siteName: COMPANY.legalName,
     locale: "vi_VN",
     type: "website",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `Thông Báo Đấu Giá | ${COMPANY.shortName}`,
-    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
+    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region}.`,
     images: [`${COMPANY.url}/opengraph-image`],
   },
 };

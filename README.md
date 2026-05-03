@@ -1,6 +1,6 @@
 # ĐẤUGIÁ — Cổng Thông Báo Đấu Giá Bất Động Sản
 
-Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** — a joint-venture real estate auction company operating in Phú Thọ and Vĩnh Phúc.
+Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** — a joint-venture real estate auction company operating in tỉnh Phú Thọ (which absorbed the former tỉnh Vĩnh Phúc in the 2025 administrative merger).
 
 Admins upload the official auction-notice DOCX/PDF documents the company issues for real estate, land-use rights (QSDĐ), judgment-execution assets (THA), and liquidation assets. Content is parsed and displayed as editorial pages so the public, businesses, and other parties interested in participating in auctions can find the active notices.
 

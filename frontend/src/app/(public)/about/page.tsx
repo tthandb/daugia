@@ -91,7 +91,7 @@ const faqs = [
   },
   {
     q: "Khu vực hoạt động đấu giá của công ty là ở đâu?",
-    a: "Công ty hoạt động chủ yếu tại tỉnh Phú Thọ và tỉnh Vĩnh Phúc, tổ chức đấu giá quyền sử dụng đất, tài sản thi hành án, tài sản thanh lý và các loại tài sản khác.",
+    a: "Công ty hoạt động chủ yếu tại tỉnh Phú Thọ (bao gồm địa bàn tỉnh Vĩnh Phúc cũ sau khi sáp nhập năm 2025), tổ chức đấu giá quyền sử dụng đất, tài sản thi hành án, tài sản thanh lý và các loại tài sản khác.",
   },
   {
     q: "Quy trình tham gia đấu giá như thế nào?",
@@ -197,7 +197,7 @@ export default function AboutPage() {
             Công ty đấu giá hợp danh hoạt động tại {COMPANY.address.region},
             chuyên về đấu giá bất động sản và tài sản. Cổng công bố thông báo
             đấu giá phục vụ người dân, doanh nghiệp và các tổ chức quan tâm
-            tham gia đấu giá tại {COMPANY.address.region} và tỉnh Vĩnh Phúc.
+            tham gia đấu giá tại {COMPANY.address.region}.
           </p>
         </div>
       </section>
@@ -227,10 +227,11 @@ export default function AboutPage() {
             </p>
             <p>
               Công ty cung cấp dịch vụ tổ chức đấu giá tài sản cho khu vực{" "}
-              <strong>tỉnh Phú Thọ</strong>, <strong>tỉnh Vĩnh Phúc</strong>{" "}
-              và phụ cận, phối hợp chặt chẽ với UBND các cấp, Chi cục Thi
-              hành án dân sự, các tổ chức tín dụng và doanh nghiệp có nhu cầu.
-              Mọi cuộc đấu giá được thực hiện công khai, minh bạch, đúng quy
+              <strong>tỉnh Phú Thọ</strong> — bao gồm cả địa bàn tỉnh Vĩnh
+              Phúc cũ sau khi sáp nhập về Phú Thọ năm 2025 — phối hợp chặt
+              chẽ với UBND các cấp, Chi cục Thi hành án dân sự, các tổ chức
+              tín dụng và doanh nghiệp có nhu cầu. Mọi cuộc đấu giá được
+              thực hiện công khai, minh bạch, đúng quy
               trình pháp luật.
             </p>
           </div>

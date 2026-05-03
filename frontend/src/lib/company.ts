@@ -35,8 +35,10 @@ export const COMPANY = {
   sameAs: [
     `https://masothue.com/${"2500634576"}-cong-ty-dau-gia-hop-danh-vinh-yen`,
   ],
-  // Service areas — narrower than 'VN' country-wide, more useful to local search.
-  serviceAreas: ["tỉnh Phú Thọ", "tỉnh Vĩnh Phúc"],
+  // Service area — tỉnh Phú Thọ after the 2025 administrative merger that
+  // absorbed the former tỉnh Vĩnh Phúc. We keep a single AdministrativeArea;
+  // the historical "Vĩnh Phúc" surfaces as a search keyword (see layout.tsx).
+  serviceAreas: ["tỉnh Phú Thọ"],
   ids: {
     organization: `${SITE_URL}/#organization`,
     website: `${SITE_URL}/#website`,
