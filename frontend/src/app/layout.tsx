@@ -11,8 +11,8 @@ export const metadata: Metadata = {
     template: `%s | ${COMPANY.shortName}`,
   },
   description:
-    `${COMPANY.legalName} — đấu giá bất động sản tại ${COMPANY.address.region}. ` +
-    `Cổng nghiên cứu thị trường cho nhà đầu tư & chuyên gia đấu giá. MST ${COMPANY.taxId}.`,
+    `${COMPANY.legalName} — công bố thông báo đấu giá bất động sản, quyền sử dụng đất ` +
+    `và tài sản tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc. MST ${COMPANY.taxId}.`,
   applicationName: COMPANY.legalName,
   authors: [{ name: COMPANY.legalName, url: COMPANY.url }],
   creator: COMPANY.legalName,

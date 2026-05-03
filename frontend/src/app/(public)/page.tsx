@@ -13,8 +13,8 @@ export const metadata: Metadata = {
     absolute: `${COMPANY.legalName} — ${COMPANY.tagline}`,
   },
   description:
-    `${COMPANY.legalName} — đấu giá bất động sản tại ${COMPANY.address.region}. ` +
-    `Cổng nghiên cứu thị trường cho nhà đầu tư & chuyên gia đấu giá.`,
+    `${COMPANY.legalName} — công bố thông báo đấu giá bất động sản, quyền sử dụng đất và tài sản ` +
+    `tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
   alternates: { canonical: "/" },
   openGraph: {
     url: COMPANY.url,
@@ -81,18 +81,18 @@ export default async function HomePage() {
               {COMPANY.legalNameUpper}
             </p>
             <h1 className="mt-4 font-heading text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
-              Nghiên Cứu Thị Trường Đấu Giá Bất Động Sản
+              Thông Báo Đấu Giá Bất Động Sản & Tài Sản
             </h1>
             <p className="mx-auto mt-6 max-w-xl font-body text-lg text-stone-400 leading-relaxed">
-              Cổng thông tin nghiên cứu chuyên sâu về thị trường đấu giá bất
-              động sản tại {COMPANY.address.region}, phục vụ nhà đầu tư và
-              chuyên gia trong ngành.
+              Công bố các thông báo đấu giá bất động sản, quyền sử dụng đất,
+              tài sản thi hành án và tài sản thanh lý tại{" "}
+              {COMPANY.address.region} và tỉnh Vĩnh Phúc.
             </p>
             <Link
               href="/articles"
               className="mt-8 inline-flex items-center gap-2 rounded-lg bg-gold px-8 py-3 font-body text-sm font-semibold text-white transition-colors hover:bg-gold-light"
             >
-              Khám Phá Nghiên Cứu
+              Xem Thông Báo Đấu Giá
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -109,7 +109,7 @@ export default async function HomePage() {
                   Nổi Bật
                 </h2>
                 <p className="mt-2 font-body text-muted-fg">
-                  Bài viết nghiên cứu được quan tâm nhất
+                  Thông báo đấu giá nổi bật
                 </p>
               </div>
               <Link
@@ -170,7 +170,7 @@ export default async function HomePage() {
                   Mới Nhất
                 </h2>
                 <p className="mt-2 font-body text-muted-fg">
-                  Các bài viết nghiên cứu mới nhất
+                  Thông báo đấu giá mới nhất
                 </p>
               </div>
               <Link

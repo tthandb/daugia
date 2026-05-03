@@ -3,6 +3,7 @@ import { serverFetch } from "@/lib/api";
 import type { Article, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
+import { COMPANY } from "@/lib/company";
 
 interface TagPageProps {
   params: { slug: string };
@@ -31,7 +32,7 @@ export async function generateMetadata({
 
   return {
     title: `#${tagName}`,
-    description: `Bài viết gắn thẻ "${tagName}" - Nghiên cứu đấu giá bất động sản`,
+    description: `Thông báo đấu giá gắn thẻ "${tagName}" — ${COMPANY.shortName}.`,
   };
 }
 

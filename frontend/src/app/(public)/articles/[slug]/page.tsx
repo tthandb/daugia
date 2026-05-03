@@ -191,7 +191,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
 
   const breadcrumbItems: { name: string; item: string }[] = [
     { name: "Trang Chủ", item: COMPANY.url },
-    { name: "Thư Viện Nghiên Cứu", item: `${COMPANY.url}/articles` },
+    { name: "Thông Báo Đấu Giá", item: `${COMPANY.url}/articles` },
   ];
   if (article.categoryName && article.categorySlug) {
     breadcrumbItems.push({

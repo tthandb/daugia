@@ -1,8 +1,8 @@
-# ĐẤUGIÁ — Cổng Nghiên Cứu Thị Trường Đấu Giá
+# ĐẤUGIÁ — Cổng Thông Báo Đấu Giá Bất Động Sản
 
-Research portal for **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** — a joint-venture real estate auction company in Vietnam.
+Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** — a joint-venture real estate auction company operating in Phú Thọ and Vĩnh Phúc.
 
-Admins upload DOCX/PDF market research documents. Content is parsed and displayed as premium editorial article pages for institutional investors and auction professionals.
+Admins upload the official auction-notice DOCX/PDF documents the company issues for real estate, land-use rights (QSDĐ), judgment-execution assets (THA), and liquidation assets. Content is parsed and displayed as editorial pages so the public, businesses, and other parties interested in participating in auctions can find the active notices.
 
 ## Architecture
 

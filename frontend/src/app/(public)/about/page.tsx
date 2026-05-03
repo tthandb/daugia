@@ -111,7 +111,7 @@ const faqs = [
   },
   {
     q: "Công ty cập nhật thông báo đấu giá mới ở đâu?",
-    a: `Tất cả thông báo đấu giá được công bố tại Thư viện nghiên cứu trên website ${COMPANY.url}/articles, cập nhật thường xuyên.`,
+    a: `Tất cả thông báo đấu giá được công bố tại trang Thông Báo Đấu Giá: ${COMPANY.url}/articles, cập nhật thường xuyên.`,
   },
 ];
 
@@ -195,9 +195,9 @@ export default function AboutPage() {
           </h1>
           <p className="mt-6 max-w-2xl font-body text-base text-stone-400 leading-relaxed sm:text-lg">
             Công ty đấu giá hợp danh hoạt động tại {COMPANY.address.region},
-            chuyên về đấu giá bất động sản và tài sản. Cổng thông tin nghiên
-            cứu thị trường phục vụ nhà đầu tư, chuyên gia định giá và cơ quan
-            quản lý.
+            chuyên về đấu giá bất động sản và tài sản. Cổng công bố thông báo
+            đấu giá phục vụ người dân, doanh nghiệp và các tổ chức quan tâm
+            tham gia đấu giá tại {COMPANY.address.region} và tỉnh Vĩnh Phúc.
           </p>
         </div>
       </section>

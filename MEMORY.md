@@ -1,4 +1,4 @@
-# Project Memory — ĐẤUGIÁ Research Portal
+# Project Memory — ĐẤUGIÁ Auction Notice Portal
 
 > Authoritative record of all design and architecture decisions. Update this file whenever decisions change.
 
@@ -11,10 +11,10 @@
 - **Tax ID**: 2500634576
 - **Established**: 2019-09-04
 - **Contact**: 0912535999 | Representative: Nguyễn Văn Dương
-- **Type**: Joint-venture real estate auction company research portal
-- **Audience**: Institutional investors, auction professionals, buyers — Vietnamese-speaking
+- **Type**: Joint-venture real estate auction company — public publisher of its own auction notices
+- **Audience**: General public, businesses, and other parties interested in participating in auctions in Phú Thọ / Vĩnh Phúc — Vietnamese-speaking. NOT a research portal for institutional investors.
 - **Language**: **Vietnamese** — all UI, labels, navigation, content
-- **UI References**: realtor.com/research (clean, data-driven) + savills.com (premium, luxury editorial)
+- **UI References (visual aesthetic only — not positioning)**: realtor.com/research (clean, data-driven) + savills.com (premium editorial)
 - **Mockup**: `mockup.html` — 4-page interactive HTML mockup (Trang Chủ, Thư Viện, Chi Tiết Bài, Quản Trị)
 
 ---
@@ -91,7 +91,7 @@ Khác                    khac                      #57534E  — 1  (maps, misc)
 
 ### Vietnamese UI Labels (reference)
 ```
-Nghiên Cứu = Research nav
+Thông Báo  = Auction-notices nav (was "Nghiên Cứu" — renamed 2026-05)
 Thị Trường = Markets nav
 Đấu Giá    = Auctions nav
 Giới Thiệu = About nav

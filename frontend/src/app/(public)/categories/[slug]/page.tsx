@@ -103,7 +103,7 @@ export default async function CategoryPage({
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Trang Chủ", item: COMPANY.url },
-      { "@type": "ListItem", position: 2, name: "Thư Viện Nghiên Cứu", item: `${COMPANY.url}/articles` },
+      { "@type": "ListItem", position: 2, name: "Thông Báo Đấu Giá", item: `${COMPANY.url}/articles` },
       { "@type": "ListItem", position: 3, name: category.name, item: `${COMPANY.url}/categories/${category.slug}` },
     ],
   };

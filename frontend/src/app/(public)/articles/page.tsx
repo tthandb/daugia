@@ -10,13 +10,13 @@ import { COMPANY } from "@/lib/company";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Thư Viện Nghiên Cứu",
-  description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.legalName}, ${COMPANY.address.region}.`,
+  title: "Thông Báo Đấu Giá",
+  description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
   alternates: { canonical: "/articles" },
   openGraph: {
     url: `${COMPANY.url}/articles`,
-    title: `Thư Viện Nghiên Cứu | ${COMPANY.shortName}`,
-    description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.address.region}.`,
+    title: `Thông Báo Đấu Giá | ${COMPANY.shortName}`,
+    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
     siteName: COMPANY.legalName,
     locale: "vi_VN",
     type: "website",
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `Thư Viện Nghiên Cứu | ${COMPANY.shortName}`,
-    description: `Thư viện nghiên cứu thị trường đấu giá bất động sản — ${COMPANY.address.region}.`,
+    title: `Thông Báo Đấu Giá | ${COMPANY.shortName}`,
+    description: `Danh sách thông báo đấu giá do ${COMPANY.legalName} công bố tại ${COMPANY.address.region} và tỉnh Vĩnh Phúc.`,
     images: [`${COMPANY.url}/opengraph-image`],
   },
 };
@@ -91,10 +91,10 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-heading text-3xl font-bold text-charcoal sm:text-4xl">
-          Thư Viện Nghiên Cứu
+          Thông Báo Đấu Giá
         </h1>
         <p className="mt-2 font-body text-muted-fg">
-          Tổng hợp các bài nghiên cứu thị trường đấu giá bất động sản
+          Toàn bộ thông báo đấu giá do {COMPANY.shortName} tổ chức và công bố
         </p>
       </div>
 

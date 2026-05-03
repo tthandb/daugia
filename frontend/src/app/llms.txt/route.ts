@@ -44,8 +44,8 @@ export async function GET() {
 - Điện thoại: ${COMPANY.phoneDisplay}
 - Mã số thuế: ${COMPANY.taxId}
 
-## Thư viện thông báo đấu giá
-- [Toàn bộ thư viện](${COMPANY.url}/articles)
+## Thông báo đấu giá
+- [Toàn bộ thông báo](${COMPANY.url}/articles)
 
 ### Danh mục
 ${categoryLines || "(không có dữ liệu)"}

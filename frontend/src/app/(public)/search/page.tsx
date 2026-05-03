@@ -8,7 +8,7 @@ import { COMPANY } from "@/lib/company";
 
 export const metadata: Metadata = {
   title: "Tìm Kiếm",
-  description: "Tìm kiếm bài viết nghiên cứu thị trường đấu giá bất động sản",
+  description: "Tìm kiếm thông báo đấu giá theo từ khoá, địa điểm hoặc loại tài sản",
   alternates: { canonical: "/search" },
   // Search-result pages should not be indexed — they create endless duplicate
   // listings keyed on user query and dilute the canonical /articles equity.
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     url: `${COMPANY.url}/search`,
     title: `Tìm Kiếm | ${COMPANY.shortName}`,
-    description: "Tìm kiếm bài viết nghiên cứu thị trường đấu giá bất động sản",
+    description: "Tìm kiếm thông báo đấu giá theo từ khoá, địa điểm hoặc loại tài sản",
     siteName: COMPANY.legalName,
     locale: "vi_VN",
     type: "website",

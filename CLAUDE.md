@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**ĐẤUGIÁ** — Research portal for **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (Joint-venture real estate auction company).
+**ĐẤUGIÁ** — Public publisher of auction notices issued by **CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (joint-venture real estate auction company operating in Phú Thọ and Vĩnh Phúc).
 
 **Company Details:**
 - **Name**: CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN
@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Representative**: Nguyễn Văn Dương
 - **Location**: Phú Thọ
 
-Admins upload DOCX/PDF/DOC market research articles; content is extracted and displayed as premium editorial article pages for institutional investors and auction professionals. Website language is **Vietnamese**.
+Admins upload the official auction-notice DOCX/PDF/DOC documents the company issues (real estate, QSDĐ land-use rights, THA judgment-execution assets, liquidation assets); content is extracted and displayed as editorial article pages so the public, businesses, and other parties interested in participating in auctions can find the active notices. Website language is **Vietnamese**.
 
 ---
 

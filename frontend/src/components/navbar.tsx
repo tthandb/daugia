@@ -6,7 +6,7 @@ import { Search, Menu, X } from "lucide-react";
 import { COMPANY } from "@/lib/company";
 
 const navLinks = [
-  { label: "Nghiên Cứu", href: "/articles" },
+  { label: "Thông Báo", href: "/articles" },
   { label: "Giới Thiệu", href: "/about" },
 ];
 

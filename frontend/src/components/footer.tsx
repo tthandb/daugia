@@ -52,7 +52,7 @@ export function Footer() {
               href="/articles"
               className="text-warm-white/60 transition-colors hover:text-gold"
             >
-              Nghiên Cứu
+              Thông Báo
             </Link>
             <Link
               href="/about"

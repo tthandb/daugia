@@ -1,8 +1,8 @@
-# Real Estate Auction Research Portal — System Design
+# Real Estate Auction Notice Portal — System Design
 
 ## Context
 
-**CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (Tax ID: 2500634576, est. 2019-09-04) — A joint-venture real estate auction company needs a public-facing research portal where admins upload market research articles (DOCX/PDF/DOC). Documents are parsed into styled editorial article pages for investors, buyers, and industry professionals. UI/UX references: realtor.com/research (clean, data-driven editorial) and savills.com (premium, sophisticated luxury). Fully self-hosted on Kubernetes.
+**CÔNG TY ĐẤU GIÁ HỢP DANH VĨNH YÊN** (Tax ID: 2500634576, est. 2019-09-04) — A joint-venture real estate auction company needs a public-facing portal where admins publish the official auction-notice DOCX/PDF/DOC documents the company issues (real estate, QSDĐ land-use rights, THA judgment-execution assets, liquidation assets). Documents are parsed into styled editorial article pages so the public, businesses, and other parties interested in participating in auctions can find the active notices. UI/UX references (visual aesthetic only): realtor.com/research (clean, data-driven editorial) and savills.com (premium, sophisticated). Fully self-hosted on Kubernetes.
 
 ---
 
@@ -35,7 +35,7 @@
 **Vietnamese** — all UI text, labels, navigation, article content, and admin interface are in Vietnamese.
 
 ### Aesthetic Direction
-Blend of **realtor.com/research** (clean, data-rich, editorial) and **savills.com** (premium, understated luxury). Target: institutional investors, auction participants, real estate professionals.
+Blend of **realtor.com/research** (clean, data-rich, editorial) and **savills.com** (premium, understated luxury) — visual aesthetic only. Target audience: the public, businesses, and other parties interested in participating in the auctions the company runs.
 
 Style: **Editorial Minimalism** — Swiss grid, high whitespace, bold typographic hierarchy, restrained gold accent on dark charcoal base.
 
@@ -81,7 +81,7 @@ Chosen for full Vietnamese diacritics support and reading comfort.
 
 **Navigation (top bar)**
 - Logo left: wordmark in Playfair Display, charcoal
-- Center: nav links (Research, Markets, Auctions, About) — Be Vietnam Pro 500, letter-spacing wide
+- Center: nav links (Notices, About) — Be Vietnam Pro 500, letter-spacing wide
 - Right: Search icon + "Admin" link (hidden unless authenticated)
 - Sticky, white background, 1px bottom border (`#D6D3D1`)
 - Mobile: hamburger → full-screen overlay menu
