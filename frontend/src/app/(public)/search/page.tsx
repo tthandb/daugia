@@ -49,84 +49,96 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="container-wide py-10">
-      {/* Header */}
-      <div className="mb-10">
-        <h1 className="font-heading text-3xl font-bold text-charcoal sm:text-4xl">
-          Tìm Kiếm
+      <div className="mx-auto max-w-2xl">
+        <p className="eyebrow text-brass-ink">Tra cứu</p>
+        <h1 className="mt-1.5 font-heading text-3xl font-bold text-ink sm:text-4xl">
+          Tìm kiếm thông báo
         </h1>
+
+        {/* Search form */}
+        <form action="/search" method="GET" role="search" className="mt-6">
+          <label htmlFor="q" className="sr-only">
+            Từ khoá tìm kiếm
+          </label>
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-card p-2 focus-within:border-pine/50">
+            <Search className="ml-2 h-5 w-5 shrink-0 text-ink-faint" aria-hidden />
+            <input
+              id="q"
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="Địa điểm, loại tài sản, số thông báo…"
+              className="min-w-0 flex-1 bg-transparent font-body text-base text-ink placeholder:text-ink-faint focus:outline-none"
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="shrink-0 rounded-lg bg-pine px-5 py-2.5 font-body text-sm font-semibold text-paper transition-colors hover:bg-brass"
+            >
+              Tìm
+            </button>
+          </div>
+        </form>
       </div>
 
-      {/* Search form */}
-      <form action="/search" method="GET" className="mb-10">
-        <div className="relative mx-auto max-w-2xl">
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Nhập từ khóa tìm kiếm..."
-            className="w-full border-0 border-b-2 border-warm-border bg-transparent py-4 font-body text-xl text-charcoal placeholder:text-muted-fg/50 focus:border-gold focus:outline-none focus:ring-0"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-muted-fg transition-colors hover:text-gold"
-            aria-label="Tìm kiếm"
-          >
-            <Search className="h-5 w-5" />
-          </button>
-        </div>
-      </form>
-
       {/* Results */}
-      {results ? (
-        <>
-          {q && (
-            <p className="mb-6 font-body text-sm text-muted-fg">
-              {results.total > 0
-                ? `Tìm thấy ${results.total} kết quả cho "${q}"`
-                : `Không tìm thấy kết quả cho "${q}"`}
+      <div className="mt-10">
+        {results ? (
+          <>
+            {q && (
+              <p className="mb-6 font-body text-sm text-ink-soft">
+                {results.total > 0 ? (
+                  <>
+                    <span className="data font-semibold text-ink">
+                      {results.total.toLocaleString("vi-VN")}
+                    </span>{" "}
+                    kết quả cho “{q}”
+                  </>
+                ) : (
+                  <>Không tìm thấy kết quả cho “{q}”</>
+                )}
+              </p>
+            )}
+
+            {results.data.length > 0 ? (
+              <>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {results.data.map((article) => (
+                    <ArticleCard key={article.id} article={article} />
+                  ))}
+                </div>
+                <div className="mt-12">
+                  <Pagination
+                    currentPage={results.page}
+                    totalPages={results.totalPages}
+                    basePath="/search"
+                    params={{ q }}
+                  />
+                </div>
+              </>
+            ) : (
+              q && (
+                <div className="rounded-xl border border-dashed border-line bg-card py-20 text-center">
+                  <Search className="mx-auto h-10 w-10 text-ink-faint" strokeWidth={1.5} />
+                  <p className="mt-4 font-heading text-lg font-semibold text-ink">
+                    Không tìm thấy kết quả
+                  </p>
+                  <p className="mt-1 font-body text-sm text-ink-soft">
+                    Thử lại với từ khoá khác hoặc xem tất cả thông báo.
+                  </p>
+                </div>
+              )
+            )}
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line bg-card py-20 text-center">
+            <Search className="mx-auto h-10 w-10 text-ink-faint" strokeWidth={1.5} />
+            <p className="mt-4 font-body text-ink-soft">
+              Nhập từ khoá để bắt đầu tìm kiếm.
             </p>
-          )}
-
-          {results.data.length > 0 ? (
-            <>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {results.data.map((article) => (
-                  <ArticleCard key={article.id} article={article} />
-                ))}
-              </div>
-
-              <div className="mt-12">
-                <Pagination
-                  currentPage={results.page}
-                  totalPages={results.totalPages}
-                  basePath="/search"
-                  params={{ q }}
-                />
-              </div>
-            </>
-          ) : (
-            q && (
-              <div className="py-20 text-center">
-                <Search className="mx-auto h-12 w-12 text-warm-border" />
-                <p className="mt-4 font-heading text-xl text-muted-fg">
-                  Không tìm thấy kết quả
-                </p>
-                <p className="mt-2 font-body text-sm text-muted-fg">
-                  Vui lòng thử lại với từ khóa khác
-                </p>
-              </div>
-            )
-          )}
-        </>
-      ) : (
-        <div className="py-20 text-center">
-          <Search className="mx-auto h-12 w-12 text-warm-border" />
-          <p className="mt-4 font-body text-muted-fg">
-            Nhập từ khóa để bắt đầu tìm kiếm
-          </p>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
