@@ -28,7 +28,6 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	province := r.URL.Query().Get("province")
 	tagSlug := r.URL.Query().Get("tag")
 
-	var articles []db.AdminListArticlesRow // reuse the row type with category join
 	var total int64
 	var err error
 
@@ -58,7 +57,6 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
-		_ = articles
 	} else if province != "" {
 		articles2, err2 := h.queries.ListPublishedArticlesByProvince(ctx, db.ListPublishedArticlesByProvinceParams{
 			Province: &province,
