@@ -199,10 +199,17 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 			uploadMime = mime
 		}
 
-		uploadFile, _ := os.Open(uploadPath)
-		stat, _ := uploadFile.Stat()
-		_ = h.store.Upload(ctx, key, uploadFile, stat.Size(), uploadMime)
-		uploadFile.Close()
+		size, err := h.uploadLocalFile(ctx, key, uploadPath, uploadMime)
+		if err != nil {
+			// Skip this image rather than inserting a row pointing at a missing
+			// object; report it so the admin knows the upload didn't take.
+			results = append(results, map[string]any{
+				"fileName": fh.Filename,
+				"error":    "tải lên thất bại",
+			})
+			os.RemoveAll(tmpDir)
+			continue
+		}
 
 		sortOrder++
 		img, err := h.queries.CreateArticleImage(ctx, db.CreateArticleImageParams{
@@ -213,7 +220,7 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 			AltText:   "",
 			Width:     imgWidth,
 			Height:    imgHeight,
-			SizeBytes: int32(stat.Size()),
+			SizeBytes: int32(size),
 			SortOrder: sortOrder,
 		})
 		if err == nil {
@@ -222,6 +229,11 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 				"url":      fmt.Sprintf("/api/images/%s", img.ID),
 				"fileName": img.FileName,
 			})
+		} else {
+			// DB insert failed after a successful upload — remove the orphan.
+			if delErr := h.store.Delete(ctx, key); delErr != nil {
+				fmt.Printf("failed to clean up orphaned image %s: %v\n", key, delErr)
+			}
 		}
 
 		os.RemoveAll(tmpDir)
@@ -310,14 +322,23 @@ func (h *Handler) AdminUploadAttachment(w http.ResponseWriter, r *http.Request) 
 	tmpDir, _ := os.MkdirTemp("", "att-*")
 	defer os.RemoveAll(tmpDir)
 	tmpFile := filepath.Join(tmpDir, header.Filename)
-	f, _ := os.Create(tmpFile)
-	io.Copy(f, file)
+	f, err := os.Create(tmpFile)
+	if err != nil {
+		writeError(w, 500, "failed to buffer upload")
+		return
+	}
+	if _, err := io.Copy(f, file); err != nil {
+		f.Close()
+		writeError(w, 500, "failed to buffer upload")
+		return
+	}
 	f.Close()
 
-	uploadFile, _ := os.Open(tmpFile)
-	stat, _ := uploadFile.Stat()
-	_ = h.store.Upload(ctx, key, uploadFile, stat.Size(), mime)
-	uploadFile.Close()
+	size, err := h.uploadLocalFile(ctx, key, tmpFile, mime)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to store attachment")
+		return
+	}
 
 	existingAtts, _ := h.queries.ListArticleAttachments(ctx, articleID)
 	sortOrder := int32(len(existingAtts))
@@ -328,10 +349,13 @@ func (h *Handler) AdminUploadAttachment(w http.ResponseWriter, r *http.Request) 
 		FileKey:   key,
 		FileName:  header.Filename,
 		FileMime:  mime,
-		SizeBytes: int32(stat.Size()),
+		SizeBytes: int32(size),
 		SortOrder: sortOrder,
 	})
 	if err != nil {
+		if delErr := h.store.Delete(ctx, key); delErr != nil {
+			fmt.Printf("failed to clean up orphaned attachment %s: %v\n", key, delErr)
+		}
 		writeError(w, 500, "failed to create attachment")
 		return
 	}

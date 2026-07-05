@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 	"golang.org/x/text/unicode/norm"
@@ -259,12 +262,14 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 
 	articleID := cuid.New()
 
-	// Upload raw file to MinIO
+	// Upload raw file to object storage. If this fails we must NOT create the
+	// article row — otherwise the notice would appear published while its source
+	// document was never stored (permanent data loss).
 	rawKey := fmt.Sprintf("raw/%s%s", articleID, ext)
-	rawFile, _ := os.Open(tmpFile)
-	stat, _ := rawFile.Stat()
-	_ = h.store.Upload(ctx, rawKey, rawFile, stat.Size(), mime)
-	rawFile.Close()
+	if _, err := h.uploadLocalFile(ctx, rawKey, tmpFile, mime); err != nil {
+		writeError(w, http.StatusBadGateway, "failed to store document; article not created")
+		return
+	}
 
 	// Create thumbnail via bimg (if we can)
 	// For document uploads, thumbnail is generated later or from first page
@@ -286,31 +291,51 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 	totalArea := nilStr(r.FormValue("totalArea"))
 
-	article, err := h.queries.CreateArticle(ctx, db.CreateArticleParams{
-		ID:               articleID,
-		Title:            title,
-		Slug:             slug,
-		Description:      description,
-		AuthorName:       authorName,
-		ContentHtml:      contentHTML,
-		ContentPlain:     contentPlain,
-		Status:           "DRAFT",
-		Province:         province,
-		District:         district,
-		Ward:             ward,
-		AssetType:        assetType,
-		PlotCount:        plotCount,
-		TotalArea:        totalArea,
-		ThumbnailKey:     nil,
-		OriginalFileKey:  &rawKey,
-		OriginalFileName: &originalFileName,
-		OriginalFileMime: &mime,
-		LegacyID:         pgtype.Int4{},
-		LegacyFileKey:    nil,
-		CategoryID:       categoryID,
-		PublishedAt:      nil,
-	})
+	baseSlug := slug
+	var article db.CreateArticleRow
+	err = nil
+	for attempt := 0; attempt < 5; attempt++ {
+		candidate := baseSlug
+		if attempt > 0 {
+			candidate = fmt.Sprintf("%s-%d", baseSlug, attempt+1)
+		}
+		article, err = h.queries.CreateArticle(ctx, db.CreateArticleParams{
+			ID:               articleID,
+			Title:            title,
+			Slug:             candidate,
+			Description:      description,
+			AuthorName:       authorName,
+			ContentHtml:      contentHTML,
+			ContentPlain:     contentPlain,
+			Status:           "DRAFT",
+			Province:         province,
+			District:         district,
+			Ward:             ward,
+			AssetType:        assetType,
+			PlotCount:        plotCount,
+			TotalArea:        totalArea,
+			ThumbnailKey:     nil,
+			OriginalFileKey:  &rawKey,
+			OriginalFileName: &originalFileName,
+			OriginalFileMime: &mime,
+			LegacyID:         pgtype.Int4{},
+			LegacyFileKey:    nil,
+			CategoryID:       categoryID,
+			PublishedAt:      nil,
+		})
+		if err == nil {
+			break
+		}
+		if !isUniqueViolation(err) {
+			break // a non-collision error — don't keep retrying
+		}
+	}
 	if err != nil {
+		// The raw document was already uploaded; remove it so a failed create
+		// doesn't leave an orphaned (billable) object in storage.
+		if delErr := h.store.Delete(ctx, rawKey); delErr != nil {
+			log.Printf("failed to clean up orphaned upload %s: %v", rawKey, delErr)
+		}
 		writeError(w, 500, fmt.Sprintf("failed to create article: %v", err))
 		return
 	}
@@ -507,6 +532,13 @@ func extFromMime(mime string) string {
 	default:
 		return ".docx"
 	}
+}
+
+// isUniqueViolation reports whether err is a Postgres unique-constraint error
+// (SQLSTATE 23505), used to retry slug generation on collision.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // slugifyTitle produces a URL-safe slug from a Vietnamese title. Diacritics are
