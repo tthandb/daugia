@@ -104,9 +104,17 @@ export async function clientFetch<T>(
     },
   });
 
+  if (res.status === 401 && typeof window !== "undefined") {
+    // Session expired (JWT is 24h). Send the admin to login and bring them back
+    // to where they were instead of silently failing every action.
+    const next = window.location.pathname + window.location.search;
+    window.location.href = `/login?next=${encodeURIComponent(next)}`;
+    throw new ApiError(401, "Phiên đăng nhập đã hết hạn");
+  }
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || `API error: ${res.status}`);
+    throw new ApiError(res.status, error.error || `API error: ${res.status}`);
   }
 
   return parseJsonOrEmpty<T>(res);

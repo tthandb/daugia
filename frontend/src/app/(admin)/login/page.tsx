@@ -1,11 +1,29 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn } from "lucide-react";
 
+// Only allow same-app relative paths as the post-login redirect, so a crafted
+// ?next=//evil.com or ?next=https://… can't turn login into an open redirect.
+function safeNext(raw: string | null): string {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return "/admin";
+}
+
 export default function LoginPage() {
+  // useSearchParams requires a Suspense boundary during prerender.
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNext(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -29,7 +47,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Đăng nhập thất bại");
       }
 
-      router.push("/admin");
+      router.push(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
     } finally {
