@@ -24,6 +24,14 @@ var sanitizePolicy = func() *bluemonday.Policy {
 	)
 	p.AllowAttrs("href").OnElements("a")
 	p.AllowAttrs("rel", "target").OnElements("a")
+	// Restrict link schemes to safe ones — without this, javascript:/data:/vbscript:
+	// URIs from uploaded documents survive into public HTML (stored XSS).
+	// AllowStandardURLs requires parseable URLs and forces rel="noopener" onto
+	// target="_blank" links (tabnabbing protection).
+	p.AllowStandardURLs()
+	p.AllowURLSchemes("http", "https", "mailto")
+	p.RequireNoFollowOnLinks(true)
+	p.RequireNoReferrerOnLinks(true)
 	return p
 }()
 
