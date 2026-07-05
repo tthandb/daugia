@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { readableTextOn } from "@/components/status-badge";
 
 export interface Category {
   id: string;
@@ -16,35 +17,45 @@ interface CategoryFilterProps {
 export function CategoryFilter({ categories, activeSlug }: CategoryFilterProps) {
   return (
     <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-      {/* "Tất Cả" pill */}
       <Link
         href="/articles"
         className={cn(
-          "inline-flex shrink-0 items-center rounded-full px-4 py-2 font-body text-sm font-medium transition-colors",
+          "inline-flex shrink-0 items-center rounded-lg px-4 py-2 font-body text-sm font-medium transition-colors",
           activeSlug === null
-            ? "bg-gold text-white"
-            : "border border-warm-border text-charcoal hover:border-gold hover:text-gold",
+            ? "bg-pine text-paper"
+            : "border border-line bg-card text-ink-soft hover:border-pine/40 hover:text-pine",
         )}
       >
-        Tất Cả
+        Tất cả
       </Link>
 
-      {/* Category pills */}
       {categories.map((category) => {
         const isActive = activeSlug === category.slug;
-
         return (
           <Link
             key={category.id}
             href={`/categories/${category.slug}`}
             className={cn(
-              "inline-flex shrink-0 items-center rounded-full px-4 py-2 font-body text-sm font-medium transition-colors",
+              "inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-medium transition-colors",
               isActive
-                ? "text-white"
-                : "border border-warm-border text-charcoal hover:border-gold hover:text-gold",
+                ? ""
+                : "border border-line bg-card text-ink-soft hover:border-pine/40 hover:text-pine",
             )}
-            style={isActive ? { backgroundColor: category.color } : undefined}
+            style={
+              isActive
+                ? {
+                    backgroundColor: category.color,
+                    color: readableTextOn(category.color),
+                  }
+                : undefined
+            }
           >
+            {!isActive && (
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: category.color }}
+              />
+            )}
             {category.name}
           </Link>
         );

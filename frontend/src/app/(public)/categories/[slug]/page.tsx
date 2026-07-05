@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { publicFetch, ApiError } from "@/lib/api";
 import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
+import { CategoryFilter } from "@/components/category-filter";
 import { Pagination } from "@/components/pagination";
 import { COMPANY } from "@/lib/company";
 
@@ -126,36 +127,51 @@ export default async function CategoryPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(collectionJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
 
-      <div className="container-wide py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3">
+      {/* Header band */}
+      <div className="border-b border-line bg-card">
+        <div className="container-wide py-8 sm:py-10">
+          <p className="eyebrow inline-flex items-center gap-2 text-brass-ink">
             <span
-              className="inline-block h-4 w-4 rounded-full"
+              className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: category.color }}
             />
-            <h1 className="font-heading text-3xl font-bold text-charcoal sm:text-4xl">
-              {category.name}
-            </h1>
-          </div>
-          <p className="mt-2 font-body text-muted-fg">
-            {articles.total} thông báo đấu giá trong danh mục này — {COMPANY.address.region}
+            Danh mục
+          </p>
+          <h1 className="mt-1.5 font-heading text-3xl font-bold text-ink sm:text-4xl">
+            {category.name}
+          </h1>
+          <p className="mt-2 font-body text-ink-soft">
+            <span className="data font-semibold text-ink">{articles.total}</span>{" "}
+            thông báo trong danh mục này — {COMPANY.address.region}
           </p>
         </div>
+      </div>
+
+      <div className="container-wide py-8">
+        {/* Category filter bar — keeps browsing possible without going Back */}
+        <CategoryFilter categories={categories} activeSlug={params.slug} />
 
         {/* Article grid */}
         {articles.data.length > 0 ? (
           <>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {articles.data.map((article) => (
-                <ArticleCard key={article.id} article={article} />
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {articles.data.map((article, idx) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  priority={idx === 0}
+                />
               ))}
             </div>
 
@@ -168,9 +184,9 @@ export default async function CategoryPage({
             </div>
           </>
         ) : (
-          <div className="py-20 text-center">
-            <p className="font-heading text-xl text-muted-fg">
-              Chưa có bài viết nào trong danh mục này
+          <div className="mt-6 rounded-xl border border-dashed border-line bg-card py-20 text-center">
+            <p className="font-heading text-lg font-semibold text-ink">
+              Chưa có thông báo nào trong danh mục này
             </p>
           </div>
         )}
