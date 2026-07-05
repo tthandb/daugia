@@ -3,9 +3,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Download, Eye, Calendar, User, FileText, Paperclip, MapPin, Clock, Wallet } from "lucide-react";
-import { publicFetch } from "@/lib/api";
+import { publicFetch, ApiError } from "@/lib/api";
 import type { Article } from "@/lib/api";
-import { formatDate, formatFileSize } from "@/lib/utils";
+import { formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
 import { ViewTracker } from "@/components/view-tracker";
 import { COMPANY } from "@/lib/company";
 
@@ -21,8 +21,12 @@ async function getArticle(slug: string): Promise<Article | null> {
   try {
     const res = await publicFetch<{ data: Article }>(`/api/articles/${slug}`);
     return res.data;
-  } catch {
-    return null;
+  } catch (err) {
+    // Only treat a genuine 404 as "not found". For any other error (upstream
+    // 5xx, network) rethrow so a failed ISR render preserves the last good
+    // cached page instead of caching a 404 across the whole catalog.
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
   }
 }
 
@@ -395,9 +399,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                           Thời gian
                         </dt>
                         <dd className="font-body text-sm font-medium text-charcoal">
-                          {formatDate(article.auctionStart)}
+                          {formatDateTime(article.auctionStart)}
                           {article.auctionEnd && (
-                            <> – {formatDate(article.auctionEnd)}</>
+                            <> – {formatDateTime(article.auctionEnd)}</>
                           )}
                         </dd>
                       </div>

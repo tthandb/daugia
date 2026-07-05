@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { publicFetch } from "@/lib/api";
+import { publicFetch, ApiError } from "@/lib/api";
 import type { Article, Category, PaginatedResponse } from "@/lib/api";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
@@ -13,13 +13,12 @@ interface CategoryPageProps {
   searchParams: { page?: string };
 }
 
+// Rethrows on transient upstream errors so a failed render preserves the cached
+// page rather than 404-ing every category during a brief API outage. Callers
+// that must tolerate build-time failures (generateStaticParams) catch instead.
 async function getCategories(): Promise<Category[]> {
-  try {
-    const res = await publicFetch<{ data: Category[] }>("/api/categories");
-    return res.data;
-  } catch {
-    return [];
-  }
+  const res = await publicFetch<{ data: Category[] }>("/api/categories");
+  return res.data;
 }
 
 async function getArticlesByCategory(
@@ -37,8 +36,12 @@ async function getArticlesByCategory(
 }
 
 export async function generateStaticParams() {
-  const cats = await getCategories();
-  return cats.map((c) => ({ slug: c.slug }));
+  try {
+    const cats = await getCategories();
+    return cats.map((c) => ({ slug: c.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({
