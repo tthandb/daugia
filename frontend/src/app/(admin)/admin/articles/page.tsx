@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   clientFetch,
+  revalidatePublic,
   type Article,
   type PaginatedResponse,
 } from "@/lib/api";
@@ -95,7 +96,9 @@ export default function ArticlesPage() {
   async function handleDelete(id: string) {
     setDeleting(true);
     try {
+      const removed = articles.find((a) => a.id === id);
       await clientFetch(`/admin/articles/${id}`, { method: "DELETE" });
+      await revalidatePublic({ slug: removed?.slug, categorySlug: removed?.categorySlug });
       setDeleteId(null);
       // If we just removed the last row on a page beyond the first, step back so
       // the user isn't left staring at an empty "Trang 3 / 2".
@@ -119,6 +122,7 @@ export default function ArticlesPage() {
       await clientFetch(`/admin/articles/${article.id}/${action}`, {
         method: "POST",
       });
+      await revalidatePublic({ slug: article.slug, categorySlug: article.categorySlug });
       await fetchArticles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật thất bại");

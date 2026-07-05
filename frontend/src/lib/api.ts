@@ -120,6 +120,25 @@ export async function clientFetch<T>(
   return parseJsonOrEmpty<T>(res);
 }
 
+// Ask the Next server to invalidate public ISR pages after an admin mutation, so
+// changes appear immediately instead of after the revalidate window. Best-effort:
+// a failure here never blocks the mutation the admin just performed.
+export async function revalidatePublic(payload: {
+  slug?: string;
+  categorySlug?: string | null;
+}): Promise<void> {
+  try {
+    await fetch("/api/revalidate", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
 // Types
 export interface Article {
   id: string;

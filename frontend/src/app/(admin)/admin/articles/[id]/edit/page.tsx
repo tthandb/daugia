@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   clientFetch,
+  revalidatePublic,
   type Article,
   type Category,
   type ArticleImage,
@@ -318,6 +319,7 @@ export default function EditArticlePage() {
     try {
       await clientFetch(`/admin/articles/${id}/${action}`, { method: "POST" });
       await loadArticle();
+      await revalidatePublic({ slug: article?.slug, categorySlug: article?.categorySlug });
       showSuccess(okMsg);
     } catch (err) {
       setError(err instanceof Error ? err.message : failMsg);

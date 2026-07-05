@@ -33,35 +33,27 @@ export const metadata: Metadata = {
   },
 };
 
+// These deliberately do NOT swallow errors. Under ISR, a fetch that throws
+// during background revalidation makes Next keep serving the last good page,
+// whereas returning [] would succeed and bake an empty homepage into the cache.
+// A genuine 200 with no articles still returns [] and renders normally.
 async function getFeaturedArticles() {
-  try {
-    const res = await publicFetch<{ data: Article[] }>(
-      "/api/articles/featured?limit=3"
-    );
-    return res.data;
-  } catch {
-    return [];
-  }
+  const res = await publicFetch<{ data: Article[] }>(
+    "/api/articles/featured?limit=3"
+  );
+  return res.data;
 }
 
 async function getLatestArticles() {
-  try {
-    const res = await publicFetch<PaginatedResponse<Article>>(
-      "/api/articles?per_page=6"
-    );
-    return res.data;
-  } catch {
-    return [];
-  }
+  const res = await publicFetch<PaginatedResponse<Article>>(
+    "/api/articles?per_page=6"
+  );
+  return res.data;
 }
 
 async function getCategories() {
-  try {
-    const res = await publicFetch<{ data: Category[] }>("/api/categories");
-    return res.data;
-  } catch {
-    return [];
-  }
+  const res = await publicFetch<{ data: Category[] }>("/api/categories");
+  return res.data;
 }
 
 export default async function HomePage() {
