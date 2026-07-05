@@ -25,39 +25,38 @@ Admins upload the official auction-notice DOCX/PDF/DOC documents the company iss
 ## Commands
 
 ```bash
-# Backend (Go)
+# Backend (Go) — one binary, subcommands (NOT separate cmd/ packages)
 cd backend
-go run cmd/api/main.go           # Dev server (port 8080)
-go run cmd/seed/main.go          # Seed admin user + categories
-go run cmd/migrate-legacy/main.go # Import 38 old articles from Supabase
-go build -o bin/api cmd/api/main.go  # Build binary
-go test ./...                    # Run all tests
-sqlc generate                    # Regenerate type-safe query code after SQL changes
+go run ./cmd/api                  # Dev server (port 8080)
+go run ./cmd/api seed             # Seed admin (requires ADMIN_EMAIL + ADMIN_PASSWORD) + categories
+go run ./cmd/api migrate-legacy   # Import 38 old articles from Supabase
+go run ./cmd/api migrate-local    # Import from a local dump
+go run ./cmd/api reoptimize-thumbs
+go build -o bin/api ./cmd/api     # Build binary
+go test ./...                     # Run all tests (parser + handler have tests)
+sqlc generate                     # Regenerate type-safe query code after SQL changes
 
-# Database Migrations
-migrate -path migrations -database "$DATABASE_URL" up    # Apply migrations
+# Database Migrations (golang-migrate is bundled in the runtime image)
+migrate -path migrations -database "$DATABASE_URL" up     # Apply migrations
 migrate -path migrations -database "$DATABASE_URL" down 1 # Rollback last
 
-# Frontend (Next.js)
+# Frontend (Next.js) — code lives in frontend/src, NOT frontend/app
 cd frontend
 bun run dev              # Next.js dev server (port 3000)
 bun run build            # Production build
 bun run lint             # ESLint
 bun run type-check       # tsc --noEmit
 
-# Kubernetes
-kubectl apply -f k8s/                                # Deploy all manifests
-kubectl rollout status deployment/api -n realestate  # Watch API rollout
-kubectl logs -l app=api -n realestate --tail=100     # API logs
-kubectl exec deploy/api -n realestate -- /app/api seed            # Seed admin + categories
-kubectl exec deploy/api -n realestate -- /app/api migrate-legacy  # Import old Supabase data
+# Deploy — HyperCore VPS via Docker Compose + Caddy (NO Kubernetes)
+# CI/CD: push to main → .github/workflows/deploy.yml builds a GHCR image and
+# SSH-deploys (compose pull + up + migrate). The k8s/ dir is dead reference only.
+cd deploy/hypercore
+docker compose pull api && docker compose up -d --no-deps api   # (CI does this)
+docker compose exec -T api sh -c 'migrate -path /app/migrations -database "$DATABASE_URL" up'
+docker compose exec -T api /app/api seed                        # seed admin + categories
+./backup.sh                                                      # daily pg_dump → R2 (cron 03:00)
 
-# Docker (build & push API image)
-docker build -t yourdockerhub/daugia-api:latest backend/
-docker push yourdockerhub/daugia-api:latest
-
-# Frontend (auto-deploys via Vercel on git push)
-cd frontend && bun run build             # Local preview build
+# Frontend auto-deploys via Vercel on git push to main.
 ```
 
 ---
@@ -65,33 +64,36 @@ cd frontend && bun run build             # Local preview build
 ## Architecture
 
 ```
-Vercel (edge network)       nginx-ingress (K8s)
-    │ Next.js SSR/SSG             │ cert-manager (TLS)
-    │                             │
- daugia.vercel.app        api.yourdomain.com
-    │                             │
-    └──── API_URL ───────────────▶│
-    (server-side fetch)           │
-                            Go API Pod
-                               │
-                          ┌────┴────┐
-                          │         │
-                       pgx       minio-go
-                          │         │
-                     PostgreSQL   MinIO
-                     (K8s Pod)  (K8s Pod)
+Vercel (edge network)          HyperCore VPS (Ho Chi Minh) — Docker Compose
+    │ Next.js SSR/SSG                │ Caddy 2 (TLS auto via Let's Encrypt)
+    │                                │
+ daugiavinhyen.com          api.daugiavinhyen.com
+    │                                │
+    └──── API_URL ──────────────────▶│
+    (server-side fetch)              │
+                               Go API container
+                                  │
+                             ┌────┴────┐
+                          pgx        minio-go (S3 API)
+                             │            │
+                        PostgreSQL   Cloudflare R2
+                        (container)  (object storage)
 ```
 
-Frontend on Vercel (SSR/SSG for SEO). Backend on k3s (Oracle Cloud Free Tier). Next.js fetches from Go API server-side for SSR pages. CORS configured on Go API. PostgreSQL and MinIO internal only.
+Frontend on Vercel (SSR/SSG for SEO). Backend + Postgres run as Docker Compose
+containers on a single HyperCore VPS fronted by Caddy; object storage is
+Cloudflare R2 (S3-compatible) via the minio-go SDK. Next.js fetches the Go API
+server-side for SSR pages. CORS configured on the Go API. Postgres is bound to
+127.0.0.1 only. (The old Oracle/k3s/nginx/self-hosted-MinIO plan was dropped —
+see MEMORY.md and deploy/hypercore/README.md for the authoritative setup.)
 
 ### Key Directories
 
 ```
 backend/
   cmd/
-    api/main.go              Go API server entrypoint
-    seed/main.go             Seed admin + categories
-    migrate-legacy/main.go   Import from old Supabase
+    api/                     Go API server + subcommands (main.go, seed.go,
+                             migrate_legacy.go, migrate_local.go, reoptimize_thumbs.go)
   internal/
     auth/                    JWT, bcrypt, Chi middleware
     handler/                 HTTP handlers (articles, images, attachments, auth, search)
@@ -104,20 +106,24 @@ backend/
   queries/                   SQL query files for sqlc
 
 frontend/
-  app/
-    (public)/                Public pages — SSR/SSG for SEO
-    (admin)/                 Admin pages — client-rendered, no SEO
-    api/                     Next.js route handlers (if needed for BFF)
-    layout.tsx               Root layout with fonts, analytics
-    sitemap.ts               Dynamic sitemap from published articles
-    robots.ts                Robots.txt config
-  components/                React components (shadcn/ui based)
-  lib/
-    api.ts                   Fetch wrapper (server + client)
-  middleware.ts              Protect /admin/* routes via JWT cookie
-  next.config.ts             API_URL rewrites for dev
+  src/                       NOTE: code is under src/, not the repo-root app/
+    app/
+      (public)/              Public pages — SSR/SSG for SEO
+      (admin)/               Admin pages — client-rendered, no SEO
+      api/revalidate/        Route handler for on-demand ISR revalidation
+      not-found/error/loading.tsx  Branded public error/empty/loading states
+      layout.tsx             Root layout — next/font (Lora, Be Vietnam Pro, IBM Plex Mono)
+      sitemap.ts / robots.ts
+    components/              React components (article-card, status-badge, navbar, …)
+    lib/
+      api.ts                 Fetch wrapper (serverFetch/publicFetch/clientFetch) + ApiError
+      auction.ts             Auction status + VND/location formatters
+    middleware.ts            Protect /admin/* routes via JWT cookie
+  next.config.mjs            /api/* rewrites to the Go API
 
-k8s/                         Kubernetes manifests (namespace, api, postgres, minio, ingress)
+deploy/hypercore/            PRODUCTION: docker-compose.yml, Caddy, backup.sh, README
+deploy/shared/               Shared Caddy config
+k8s/                         DEAD reference only — not the deployment target
 ```
 
 ---
@@ -142,16 +148,24 @@ k8s/                         Kubernetes manifests (namespace, api, postgres, min
 
 ## Design System (Do Not Change Without Updating MEMORY.md)
 
-**Fonts** (Vietnamese support required):
-- Headings: `Playfair Display` (serif)
-- Body: `Be Vietnam Pro` (sans-serif)
-- Do NOT revert to Cinzel or Josefin Sans — they lack Vietnamese diacritic support
+Redesigned 2026-07 → "official gazette / land registry" direction (auction-facts-first).
+Tokens live in `frontend/tailwind.config.ts`; fonts are self-hosted via `next/font`.
 
-**Colors**:
-- Primary/charcoal: `#1C1917`
-- Gold accent: `#A16207`
-- Background: `#FAFAF9`
-- Text: `#0C0A09`
+**Fonts** (Vietnamese support required — all self-hosted, no Google Fonts @import):
+- Serif (display titles + legal document body): `Lora` — `font-heading` / `font-document`
+- Sans (UI, labels, cards): `Be Vietnam Pro` — `font-body` / `font-sans`
+- Mono (auction data — dates, prices, notice numbers): `IBM Plex Mono` — `font-mono` / `.data`
+- Do NOT use Playfair Display, Cinzel, Josefin Sans, or Times New Roman.
+
+**Colors** (Tailwind token names → hex):
+- `pine` `#1B4332` — primary brand green (buttons, links, accents); `pine-deep` `#122F23` hero/footer
+- `brass` `#9A6B1E` — accent (wordmark, active, emphasis); `brass-ink` `#7E5514` for small text on light
+- `ink` `#16211C` text · `paper` `#F4F6F1` background · `line` `#DEE3D8` borders · `ink-soft`/`ink-faint` muted
+- Auction status semantics (separate from accent): `status-open` (green) / `status-soon` (amber) / `status-ended` (gray)
+- Legacy names (`charcoal`/`gold`/`warm-white`/`muted-fg`) are kept as REMAPPED aliases → the new palette.
+
+**Signature elements**: auction "docket" fact strip on cards + detail (location · time · starting price · deposit),
+computed live status badge (Sắp/Đang/Đã diễn ra), pine-on-paper with a disciplined brass accent.
 
 ---
 
