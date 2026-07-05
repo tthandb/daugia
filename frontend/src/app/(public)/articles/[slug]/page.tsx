@@ -223,16 +223,16 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
       article.district ||
       article.ward,
   );
-  const locationChips = [
-    article.ward,
-    article.district,
-    article.province,
-  ]
+  // The listing only supports filtering by province, so every location chip
+  // links to the article's province (not the ward/district's own value, which
+  // would produce an empty `?province=<ward>` result). When there's no province
+  // the chips render as plain, non-linked labels.
+  const provinceHref = article.province
+    ? `/articles?province=${encodeURIComponent(article.province)}`
+    : null;
+  const locationChips = [article.ward, article.district, article.province]
     .filter((v): v is string => Boolean(v))
-    .map((label) => ({
-      label,
-      href: `/articles?province=${encodeURIComponent(article.province || label)}`,
-    }));
+    .map((label, i) => ({ label, key: `${i}-${label}` }));
 
   // JSON-LD structured data — Article + BreadcrumbList graph (+ Event when set)
   const articleUrl = `${COMPANY.url}/articles/${article.slug}`;
@@ -480,15 +480,24 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                         Vị trí tài sản
                       </dt>
                       <dd className="flex flex-wrap gap-2">
-                        {locationChips.map((chip) => (
-                          <Link
-                            key={chip.label}
-                            href={chip.href}
-                            className="inline-flex items-center rounded-md bg-pine-pale px-2.5 py-1 font-body text-xs font-medium text-pine transition-colors hover:bg-pine hover:text-paper"
-                          >
-                            {chip.label}
-                          </Link>
-                        ))}
+                        {locationChips.map((chip) =>
+                          provinceHref ? (
+                            <Link
+                              key={chip.key}
+                              href={provinceHref}
+                              className="inline-flex items-center rounded-md bg-pine-pale px-2.5 py-1 font-body text-xs font-medium text-pine transition-colors hover:bg-pine hover:text-paper"
+                            >
+                              {chip.label}
+                            </Link>
+                          ) : (
+                            <span
+                              key={chip.key}
+                              className="inline-flex items-center rounded-md bg-pine-pale px-2.5 py-1 font-body text-xs font-medium text-pine"
+                            >
+                              {chip.label}
+                            </span>
+                          ),
+                        )}
                       </dd>
                     </div>
                   )}
