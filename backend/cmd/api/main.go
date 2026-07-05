@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/daugia999/backend/internal/auth"
@@ -105,7 +106,10 @@ func main() {
 		r.Get("/articles", h.ListArticles)
 		r.Get("/articles/featured", h.FeaturedArticles)
 		r.Get("/articles/{slug}", h.GetArticle)
-		r.Post("/articles/{id}/view", h.TrackView)
+		r.Group(func(r chi.Router) {
+			r.Use(httprate.LimitByIP(30, time.Minute))
+			r.Post("/articles/{id}/view", h.TrackView)
+		})
 
 		// Categories & tags
 		r.Get("/categories", h.ListCategories)
@@ -126,8 +130,12 @@ func main() {
 		// Sitemap data
 		r.Get("/sitemap", h.SitemapData)
 
-		// Auth
-		r.Post("/auth/login", h.Login)
+		// Auth. Rate-limit login (bcrypt is ~60-100ms of CPU per attempt against a
+		// single known admin email) to blunt brute force and cheap CPU-exhaustion.
+		r.Group(func(r chi.Router) {
+			r.Use(httprate.LimitByIP(5, time.Minute))
+			r.Post("/auth/login", h.Login)
+		})
 		r.Post("/auth/logout", h.Logout)
 		r.Get("/auth/me", h.Me)
 
