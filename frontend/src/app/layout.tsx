@@ -1,8 +1,32 @@
 import type { Metadata, Viewport } from "next";
+import { Lora, Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { COMPANY } from "@/lib/company";
 import { OrganizationJsonLd } from "@/components/seo/organization-jsonld";
 import "./globals.css";
+
+// Self-hosted via next/font (no render-blocking Google Fonts @import).
+// Lora — serif for display headings + the legal notice body (Vietnamese subset).
+const serif = Lora({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-serif",
+  display: "swap",
+});
+// Be Vietnam Pro — UI/body, purpose-built for Vietnamese.
+const sans = Be_Vietnam_Pro({
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+// IBM Plex Mono — auction data (dates, prices, notice numbers). Latin/numeric.
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(COMPANY.url),
@@ -70,7 +94,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1C1917",
+  themeColor: "#1B4332",
 };
 
 export default function RootLayout({
@@ -79,7 +103,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
+    <html
+      lang="vi"
+      className={`${serif.variable} ${sans.variable} ${mono.variable}`}
+    >
       <body>
         <OrganizationJsonLd />
         {children}
