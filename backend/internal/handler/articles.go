@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
@@ -53,7 +54,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
@@ -74,7 +75,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
@@ -99,7 +100,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
@@ -119,7 +120,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	for i, a := range articles3 {
 		items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 			a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 	}
 	writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 }
@@ -142,7 +143,7 @@ func (h *Handler) FeaturedArticles(w http.ResponseWriter, r *http.Request) {
 	for i, a := range articles {
 		items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 			a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
@@ -400,12 +401,18 @@ func (h *Handler) SitemapData(w http.ResponseWriter, r *http.Request) {
 func articleListRow(id, title, slug, description, authorName, status string,
 	publishedAt *time.Time, province, district, ward, thumbnailKey *string,
 	viewCount int32, categoryName, categorySlug, categoryColor *string,
-	createdAt, updatedAt time.Time) map[string]any {
+	createdAt, updatedAt time.Time,
+	auctionStart, auctionEnd *time.Time, startingPrice pgtype.Int8) map[string]any {
 
 	var thumbnailURL *string
 	if thumbnailKey != nil {
 		url := fmt.Sprintf("/api/thumbs/%s", id)
 		thumbnailURL = &url
+	}
+
+	var startPrice *int64
+	if startingPrice.Valid {
+		startPrice = &startingPrice.Int64
 	}
 
 	return map[string]any{
@@ -426,6 +433,9 @@ func articleListRow(id, title, slug, description, authorName, status string,
 		"categoryColor": categoryColor,
 		"createdAt":     createdAt,
 		"updatedAt":     updatedAt,
+		"auctionStart":  auctionStart,
+		"auctionEnd":    auctionEnd,
+		"startingPrice": startPrice,
 	}
 }
 
