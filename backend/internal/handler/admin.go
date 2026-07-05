@@ -8,11 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/daugia999/backend/internal/db"
 	"github.com/daugia999/backend/internal/parser"
@@ -506,18 +509,38 @@ func extFromMime(mime string) string {
 	}
 }
 
+// slugifyTitle produces a URL-safe slug from a Vietnamese title. Diacritics are
+// transliterated to their base ASCII letter (NFD + strip combining marks) rather
+// than dropped, so "Thông báo đấu giá" becomes "thong-bao-dau-gia" instead of a
+// mangled, collision-prone "thng-bo-u-gi".
 func slugifyTitle(title string) string {
-	s := title
-	// Simple slugification
-	var result []byte
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			result = append(result, byte(r))
-		} else if r >= 'A' && r <= 'Z' {
-			result = append(result, byte(r+32))
-		} else if r == ' ' {
-			result = append(result, '-')
+	// Decompose accented runes into base letter + combining marks, then drop the marks.
+	decomposed := norm.NFD.String(title)
+
+	var b strings.Builder
+	prevDash := false
+	for _, r := range decomposed {
+		if unicode.Is(unicode.Mn, r) { // Mn = nonspacing combining mark
+			continue
+		}
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevDash = false
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r + 32)
+			prevDash = false
+		case r == 'đ' || r == 'Đ':
+			b.WriteByte('d')
+			prevDash = false
+		case r == ' ' || r == '-' || r == '_':
+			if !prevDash && b.Len() > 0 {
+				b.WriteByte('-')
+				prevDash = true
+			}
+		default:
+			// drop other punctuation/symbols
 		}
 	}
-	return string(result)
+	return strings.Trim(b.String(), "-")
 }
