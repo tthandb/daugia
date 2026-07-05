@@ -20,6 +20,10 @@ backend/.env
 # K8s secrets (never commit real secrets)
 k8s/secrets.yaml
 
+# Supabase CLI machine state (contains a live pooler connection string — never commit)
+supabase/
+.temp/
+
 # OS
 .DS_Store
 Thumbs.db
