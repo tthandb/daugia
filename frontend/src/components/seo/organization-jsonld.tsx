@@ -11,7 +11,7 @@ export function OrganizationJsonLd() {
         legalName: COMPANY.legalNameUpper,
         alternateName: COMPANY.shortName,
         url: COMPANY.url,
-        logo: `${COMPANY.url}/icon.png`,
+        logo: `${COMPANY.url}/icon`,
         image: `${COMPANY.url}/opengraph-image`,
         telephone: COMPANY.phoneTel,
         taxID: COMPANY.taxId,
@@ -75,7 +75,9 @@ export function OrganizationJsonLd() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }}
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(json).replace(/</g, "\\u003c"),
+      }}
     />
   );
 }

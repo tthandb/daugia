@@ -1,13 +1,16 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
@@ -25,7 +28,6 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	province := r.URL.Query().Get("province")
 	tagSlug := r.URL.Query().Get("tag")
 
-	var articles []db.AdminListArticlesRow // reuse the row type with category join
 	var total int64
 	var err error
 
@@ -51,11 +53,10 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
-		_ = articles
 	} else if province != "" {
 		articles2, err2 := h.queries.ListPublishedArticlesByProvince(ctx, db.ListPublishedArticlesByProvinceParams{
 			Province: &province,
@@ -72,7 +73,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
@@ -97,7 +98,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 		for i, a := range articles2 {
 			items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 				a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+				a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 		}
 		writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 		return
@@ -117,7 +118,7 @@ func (h *Handler) ListArticles(w http.ResponseWriter, r *http.Request) {
 	for i, a := range articles3 {
 		items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 			a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 	}
 	writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 }
@@ -140,7 +141,7 @@ func (h *Handler) FeaturedArticles(w http.ResponseWriter, r *http.Request) {
 	for i, a := range articles {
 		items[i] = articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName,
 			a.Status, a.PublishedAt, a.Province, a.District, a.Ward,
-			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt)
+			a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug, a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
@@ -345,23 +346,34 @@ func (h *Handler) SearchArticles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) TrackView(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	// Hash the IP
 	ip := r.RemoteAddr
 	ipHash := fmt.Sprintf("%x", sha256.Sum256([]byte(ip)))
+	userAgent := nilStr(r.UserAgent())
+	referrer := nilStr(r.Referer())
 
-	// Fire and forget
+	// Fire and forget. Use a context detached from the request so the writes are
+	// not cancelled the moment the handler returns (the previous code reused
+	// r.Context(), so every insert died with "context canceled" and no view was
+	// ever recorded).
 	go func() {
-		_ = h.queries.CreateViewEvent(ctx, db.CreateViewEventParams{
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.queries.CreateViewEvent(ctx, db.CreateViewEventParams{
 			ID:        cuid.New(),
 			ArticleID: id,
 			IpHash:    ipHash,
-			UserAgent: nilStr(r.UserAgent()),
-			Referrer:  nilStr(r.Referer()),
-		})
-		_ = h.queries.IncrementViewCount(ctx, id)
+			UserAgent: userAgent,
+			Referrer:  referrer,
+		}); err != nil {
+			log.Printf("view tracking: create event failed for %s: %v", id, err)
+			return
+		}
+		if err := h.queries.IncrementViewCount(ctx, id); err != nil {
+			log.Printf("view tracking: increment count failed for %s: %v", id, err)
+		}
 	}()
 
 	w.WriteHeader(http.StatusNoContent)
@@ -387,12 +399,18 @@ func (h *Handler) SitemapData(w http.ResponseWriter, r *http.Request) {
 func articleListRow(id, title, slug, description, authorName, status string,
 	publishedAt *time.Time, province, district, ward, thumbnailKey *string,
 	viewCount int32, categoryName, categorySlug, categoryColor *string,
-	createdAt, updatedAt time.Time) map[string]any {
+	createdAt, updatedAt time.Time,
+	auctionStart, auctionEnd *time.Time, startingPrice pgtype.Int8) map[string]any {
 
 	var thumbnailURL *string
 	if thumbnailKey != nil {
 		url := fmt.Sprintf("/api/thumbs/%s", id)
 		thumbnailURL = &url
+	}
+
+	var startPrice *int64
+	if startingPrice.Valid {
+		startPrice = &startingPrice.Int64
 	}
 
 	return map[string]any{
@@ -413,6 +431,9 @@ func articleListRow(id, title, slug, description, authorName, status string,
 		"categoryColor": categoryColor,
 		"createdAt":     createdAt,
 		"updatedAt":     updatedAt,
+		"auctionStart":  auctionStart,
+		"auctionEnd":    auctionEnd,
+		"startingPrice": startPrice,
 	}
 }
 

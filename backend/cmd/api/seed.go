@@ -13,14 +13,12 @@ import (
 )
 
 func seedDB(ctx context.Context, queries *db.Queries) {
-	// Seed admin user
+	// Seed admin user. Require credentials from the environment — never fall back
+	// to a hardcoded default, which would create a publicly-known admin account.
 	email := os.Getenv("ADMIN_EMAIL")
 	password := os.Getenv("ADMIN_PASSWORD")
-	if email == "" {
-		email = "admin@daugia.vn"
-	}
-	if password == "" {
-		password = "changeme123"
+	if email == "" || password == "" {
+		log.Fatal("ADMIN_EMAIL and ADMIN_PASSWORD must be set to seed the admin user")
 	}
 
 	exists, err := queries.UserExists(ctx, email)

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   clientFetch,
+  revalidatePublic,
   type Article,
   type PaginatedResponse,
 } from "@/lib/api";
@@ -57,6 +58,7 @@ export default function ArticlesPage() {
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const deleteTarget = deleteId
     ? articles.find((a) => a.id === deleteId)
@@ -94,9 +96,17 @@ export default function ArticlesPage() {
   async function handleDelete(id: string) {
     setDeleting(true);
     try {
+      const removed = articles.find((a) => a.id === id);
       await clientFetch(`/admin/articles/${id}`, { method: "DELETE" });
+      await revalidatePublic({ slug: removed?.slug, categorySlug: removed?.categorySlug });
       setDeleteId(null);
-      await fetchArticles();
+      // If we just removed the last row on a page beyond the first, step back so
+      // the user isn't left staring at an empty "Trang 3 / 2".
+      if (articles.length === 1 && page > 1) {
+        setPage((p) => p - 1); // triggers a refetch via the page dependency
+      } else {
+        await fetchArticles();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xoá thất bại");
     } finally {
@@ -105,14 +115,19 @@ export default function ArticlesPage() {
   }
 
   async function handleTogglePublish(article: Article) {
+    if (togglingId) return;
+    setTogglingId(article.id);
     try {
       const action = article.status === "PUBLISHED" ? "unpublish" : "publish";
       await clientFetch(`/admin/articles/${article.id}/${action}`, {
         method: "POST",
       });
-      fetchArticles();
+      await revalidatePublic({ slug: article.slug, categorySlug: article.categorySlug });
+      await fetchArticles();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật thất bại");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -236,7 +251,8 @@ export default function ArticlesPage() {
                         <button
                           type="button"
                           onClick={() => handleTogglePublish(article)}
-                          className="rounded p-1.5 text-muted-fg transition-colors hover:bg-warm-white hover:text-charcoal"
+                          disabled={togglingId === article.id}
+                          className="rounded p-1.5 text-muted-fg transition-colors hover:bg-warm-white hover:text-charcoal disabled:opacity-40"
                           title={
                             article.status === "PUBLISHED"
                               ? "Gỡ xuất bản"

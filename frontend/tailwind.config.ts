@@ -9,20 +9,47 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        charcoal: "#1C1917",
-        "charcoal-light": "#44403C",
-        gold: "#A16207",
-        "gold-light": "#CA8A04",
-        "gold-pale": "#FEF3C7",
-        "warm-white": "#FAFAF9",
-        "warm-border": "#D6D3D1",
-        "muted-fg": "#78716C",
-        fg: "#0C0A09",
+        // ── New "official gazette" system ──────────────────────────────
+        paper: "#F4F6F1", // warm-cool off-white with a faint green bias
+        card: "#FFFFFF",
+        ink: "#16211C", // pine near-black — text, headers, dark sections
+        "ink-soft": "#4C574F", // muted secondary text
+        "ink-faint": "#7C867E", // metadata, captions
+        line: "#DEE3D8", // borders / dividers
+        pine: "#1B4332", // primary brand green — buttons, links, accents
+        "pine-bright": "#2D6A4F", // hover / lighter green
+        "pine-deep": "#122F23", // darkest green — hero, footer
+        "pine-pale": "#E7EFE8", // green tint — chips, hover surfaces
+        brass: "#9A6B1E", // accent — wordmark, emphasis, active
+        "brass-ink": "#7E5514", // brass for small text on light (AA)
+        "brass-pale": "#F5ECDA", // brass tint background
+        // auction status semantics (separate from brand accent)
+        "status-open": "#15803D",
+        "status-open-bg": "#E4F2E8",
+        "status-soon": "#B45309",
+        "status-soon-bg": "#F9EEDD",
+        "status-ended": "#6B7280",
+        "status-ended-bg": "#EEEFEC",
+
+        // ── Legacy aliases (remapped so un-refactored pages re-theme) ───
+        charcoal: "#16211C",
+        "charcoal-light": "#3A463F",
+        gold: "#9A6B1E",
+        "gold-light": "#B98526",
+        "gold-pale": "#F5ECDA",
+        "warm-white": "#F4F6F1",
+        "warm-border": "#DEE3D8",
+        "muted-fg": "#4C574F",
+        fg: "#16211C",
       },
       fontFamily: {
-        heading: ["Playfair Display", "serif"],
-        body: ["Be Vietnam Pro", "sans-serif"],
-        document: ["Times New Roman", "Times", "serif"],
+        serif: ["var(--font-serif)", "Lora", "serif"],
+        sans: ["var(--font-sans)", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        // aliases used throughout existing markup
+        heading: ["var(--font-serif)", "Lora", "serif"],
+        body: ["var(--font-sans)", "sans-serif"],
+        document: ["var(--font-serif)", "Lora", "serif"], // was Times New Roman
       },
       keyframes: {
         "overlay-in": {
@@ -41,24 +68,25 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
-            "--tw-prose-body": "#0C0A09",
-            "--tw-prose-headings": "#1C1917",
-            "--tw-prose-links": "#A16207",
-            "--tw-prose-bold": "#1C1917",
-            "--tw-prose-quotes": "#44403C",
-            "--tw-prose-quote-borders": "#A16207",
+            "--tw-prose-body": "#22302A",
+            "--tw-prose-headings": "#16211C",
+            "--tw-prose-links": "#1B4332",
+            "--tw-prose-bold": "#16211C",
+            "--tw-prose-quotes": "#3A463F",
+            "--tw-prose-quote-borders": "#9A6B1E",
             maxWidth: "none",
-            h1: { fontFamily: "Playfair Display, serif" },
-            h2: { fontFamily: "Playfair Display, serif" },
-            h3: { fontFamily: "Playfair Display, serif" },
-            h4: { fontFamily: "Playfair Display, serif" },
+            h1: { fontFamily: "var(--font-serif), serif" },
+            h2: { fontFamily: "var(--font-serif), serif" },
+            h3: { fontFamily: "var(--font-serif), serif" },
+            h4: { fontFamily: "var(--font-serif), serif" },
             a: {
-              color: "#A16207",
-              textDecoration: "none",
-              "&:hover": { color: "#CA8A04" },
+              color: "#1B4332",
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+              "&:hover": { color: "#9A6B1E" },
             },
             blockquote: {
-              borderLeftColor: "#A16207",
+              borderLeftColor: "#9A6B1E",
               fontStyle: "normal",
             },
             table: {
@@ -66,7 +94,7 @@ const config: Config = {
               lineHeight: "1.5",
               width: "100%",
               borderCollapse: "collapse",
-              fontFamily: "'Be Vietnam Pro', sans-serif",
+              fontFamily: "var(--font-sans), sans-serif",
               fontVariantNumeric: "tabular-nums",
             },
             "thead th": {
@@ -76,9 +104,9 @@ const config: Config = {
               letterSpacing: "0.05em",
               whiteSpace: "nowrap",
               padding: "0.625rem 0.75rem",
-              backgroundColor: "#1C1917",
+              backgroundColor: "#1B4332",
               color: "#FFFFFF",
-              borderBottom: "2px solid #1C1917",
+              borderBottom: "2px solid #1B4332",
               textAlign: "left",
             },
             "thead th:first-child": {
@@ -90,14 +118,14 @@ const config: Config = {
             "tbody td": {
               padding: "0.5rem 0.75rem",
               verticalAlign: "top",
-              borderBottom: "1px solid #E7E5E4",
-              color: "#1C1917",
+              borderBottom: "1px solid #E7EAE3",
+              color: "#22302A",
             },
             "tbody tr:nth-child(even)": {
-              backgroundColor: "#FAFAF9",
+              backgroundColor: "#F4F6F1",
             },
             "tbody tr:hover": {
-              backgroundColor: "#F5F5F4",
+              backgroundColor: "#EDF1EA",
             },
             "tbody tr:last-child td": {
               borderBottom: "none",

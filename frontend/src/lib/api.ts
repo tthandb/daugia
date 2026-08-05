@@ -4,6 +4,22 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
+/**
+ * Error thrown by all fetchers. `status` is the HTTP status code, or 0 for a
+ * network/transport failure. Callers use this to distinguish a genuine 404
+ * (render notFound) from a transient upstream error (rethrow so ISR keeps
+ * serving the last good page instead of caching a 404 / empty state).
+ */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { params, ...fetchOptions } = options;
 
@@ -23,7 +39,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || `API error: ${res.status}`);
+    throw new ApiError(res.status, error.error || `API error: ${res.status}`);
   }
 
   return parseJsonOrEmpty<T>(res);
@@ -88,12 +104,39 @@ export async function clientFetch<T>(
     },
   });
 
+  if (res.status === 401 && typeof window !== "undefined") {
+    // Session expired (JWT is 24h). Send the admin to login and bring them back
+    // to where they were instead of silently failing every action.
+    const next = window.location.pathname + window.location.search;
+    window.location.href = `/login?next=${encodeURIComponent(next)}`;
+    throw new ApiError(401, "Phiên đăng nhập đã hết hạn");
+  }
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || `API error: ${res.status}`);
+    throw new ApiError(res.status, error.error || `API error: ${res.status}`);
   }
 
   return parseJsonOrEmpty<T>(res);
+}
+
+// Ask the Next server to invalidate public ISR pages after an admin mutation, so
+// changes appear immediately instead of after the revalidate window. Best-effort:
+// a failure here never blocks the mutation the admin just performed.
+export async function revalidatePublic(payload: {
+  slug?: string;
+  categorySlug?: string | null;
+}): Promise<void> {
+  try {
+    await fetch("/api/revalidate", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // non-fatal
+  }
 }
 
 // Types

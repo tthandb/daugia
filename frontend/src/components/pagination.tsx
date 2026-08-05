@@ -68,13 +68,16 @@ export function Pagination({
       {currentPage > 1 ? (
         <Link
           href={buildHref(basePath, currentPage - 1, params)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-warm-border text-charcoal transition-colors hover:bg-charcoal hover:text-white"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-card text-ink transition-colors hover:bg-pine hover:text-paper"
           aria-label="Trang trước"
         >
           <ChevronLeft className="h-4 w-4" />
         </Link>
       ) : (
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-warm-border text-muted-fg/40">
+        <span
+          aria-hidden
+          className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-lg text-ink-faint/40"
+        >
           <ChevronLeft className="h-4 w-4" />
         </span>
       )}
@@ -84,19 +87,19 @@ export function Pagination({
         page === "..." ? (
           <span
             key={`ellipsis-${idx}`}
-            className="inline-flex h-10 w-10 items-center justify-center font-body text-sm text-muted-fg"
+            className="inline-flex h-10 w-10 items-center justify-center font-body text-sm text-ink-faint"
           >
-            ...
+            …
           </span>
         ) : (
           <Link
             key={page}
             href={buildHref(basePath, page, params)}
             className={cn(
-              "inline-flex h-10 w-10 items-center justify-center rounded-lg font-body text-sm font-medium transition-colors",
+              "inline-flex h-10 w-10 items-center justify-center rounded-lg font-mono text-sm font-medium tabular-nums transition-colors",
               page === currentPage
-                ? "bg-charcoal text-white"
-                : "border border-warm-border text-charcoal hover:bg-charcoal hover:text-white",
+                ? "bg-pine text-paper"
+                : "border border-line bg-card text-ink hover:bg-pine hover:text-paper",
             )}
             aria-current={page === currentPage ? "page" : undefined}
           >
@@ -109,13 +112,16 @@ export function Pagination({
       {currentPage < totalPages ? (
         <Link
           href={buildHref(basePath, currentPage + 1, params)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-warm-border text-charcoal transition-colors hover:bg-charcoal hover:text-white"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-card text-ink transition-colors hover:bg-pine hover:text-paper"
           aria-label="Trang sau"
         >
           <ChevronRight className="h-4 w-4" />
         </Link>
       ) : (
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-warm-border text-muted-fg/40">
+        <span
+          aria-hidden
+          className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-lg text-ink-faint/40"
+        >
           <ChevronRight className="h-4 w-4" />
         </span>
       )}

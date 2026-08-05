@@ -181,7 +181,9 @@ export default function AboutPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(aboutJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
 
       {/* Hero */}

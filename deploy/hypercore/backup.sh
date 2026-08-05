@@ -11,15 +11,32 @@ set -a
 . ./.env
 set +a
 
+# Optional dead-man's-switch: set HEARTBEAT_URL (e.g. a healthchecks.io ping URL)
+# in .env. We hit /start now and the base URL on success; if a run silently stops
+# producing dumps, the monitor alerts instead of the failure going unnoticed.
+ping() { [ -n "${HEARTBEAT_URL:-}" ] && curl -fsS -m 10 "${HEARTBEAT_URL}${1:-}" >/dev/null 2>&1 || true; }
+trap 'ping /fail' ERR
+ping /start
+
 TS=$(date -u +%Y%m%d-%H%M%S)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 DUMP="$TMP/db-$TS.sql.gz"
 
+# Dump roles/globals first (so the daugia role can be recreated on a bare restore),
+# then the database itself, into one gzipped file.
+{
+  docker compose exec -T postgres pg_dumpall -U "$POSTGRES_USER" --globals-only
+  docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"
+} | gzip -9 > "$DUMP"
+
+# Prune view_events older than 90 days so the append-only table can't grow
+# unbounded on the shared 40 GB disk. Best-effort; never fails the backup.
 docker compose exec -T postgres \
-  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" \
-  | gzip -9 > "$DUMP"
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "DELETE FROM view_events WHERE viewed_at < now() - interval '90 days';" \
+  >/dev/null 2>&1 || true
 
 # Requires `aws` CLI configured against Cloudflare R2.
 # Set up once with:
@@ -45,4 +62,5 @@ aws --profile r2 \
         s3 rm "s3://${OBJECT_STORAGE_BUCKET}-backups/postgres/db-$old"
     done
 
+ping   # success — ping the base heartbeat URL
 echo "$(date -u) ok ${DUMP##*/}"

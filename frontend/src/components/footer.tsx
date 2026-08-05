@@ -1,73 +1,94 @@
 import Link from "next/link";
+import { MapPin, Phone, FileText } from "lucide-react";
 import { COMPANY, mapsSearchUrl } from "@/lib/company";
 
 export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-charcoal text-warm-white">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center gap-6 text-center">
-          {/* Brand mark */}
-          <Link
-            href="/"
-            className="font-heading text-2xl font-bold text-warm-white"
-          >
-            {COMPANY.brandMark}
-          </Link>
-
-          <p className="font-body text-sm font-medium uppercase tracking-wider text-warm-white/80">
-            {COMPANY.legalNameUpper}
-          </p>
-
-          {/* Address */}
-          <address className="not-italic font-body text-sm text-warm-white/70">
-            <a
-              href={mapsSearchUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-gold"
-            >
-              {COMPANY.address.full}
-            </a>
-          </address>
-
-          {/* Contact info */}
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-body text-sm text-warm-white/60">
-            <a
-              href={`tel:${COMPANY.phoneTel}`}
-              className="transition-colors hover:text-gold"
-            >
-              {COMPANY.phoneDisplay}
-            </a>
-            <span className="hidden sm:inline">|</span>
-            <span>MST: {COMPANY.taxId}</span>
-            <span className="hidden sm:inline">|</span>
-            <span>Đại diện: {COMPANY.representative}</span>
+    <footer className="border-t-4 border-brass bg-pine-deep text-paper/80">
+      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+          {/* Brand + identity */}
+          <div>
+            <Link href="/" className="inline-flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="grid h-9 w-9 place-items-center rounded-md bg-brass font-heading text-lg font-bold text-pine-deep"
+              >
+                Đ
+              </span>
+              <span className="font-heading text-xl font-bold text-paper">
+                {COMPANY.brandMark}
+              </span>
+            </Link>
+            <p className="mt-4 max-w-sm font-body text-sm leading-relaxed text-paper/70">
+              {COMPANY.legalName} — công bố các thông báo đấu giá tài sản, bất
+              động sản và quyền sử dụng đất tại {COMPANY.address.region}.
+            </p>
+            <p className="mt-4 font-mono text-xs tracking-tight text-paper/50">
+              MST {COMPANY.taxId} · Đại diện {COMPANY.representative}
+            </p>
           </div>
 
-          {/* Nav links */}
-          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-body text-sm">
-            <Link
-              href="/articles"
-              className="text-warm-white/60 transition-colors hover:text-gold"
-            >
-              Thông Báo
-            </Link>
-            <Link
-              href="/about"
-              className="text-warm-white/60 transition-colors hover:text-gold"
-            >
-              Giới Thiệu
-            </Link>
-          </nav>
+          {/* Contact */}
+          <div>
+            <h2 className="eyebrow text-brass/80">Liên hệ</h2>
+            <ul className="mt-4 space-y-3 font-body text-sm">
+              <li>
+                <a
+                  href={mapsSearchUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2.5 text-paper/70 transition-colors hover:text-brass"
+                >
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brass/70" />
+                  <span>{COMPANY.address.full}</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`tel:${COMPANY.phoneTel}`}
+                  className="flex items-center gap-2.5 text-paper/70 transition-colors hover:text-brass"
+                >
+                  <Phone className="h-4 w-4 shrink-0 text-brass/70" />
+                  <span className="data">{COMPANY.phoneDisplay}</span>
+                </a>
+              </li>
+            </ul>
+          </div>
 
-          {/* Divider */}
-          <div className="h-px w-full max-w-xs bg-warm-white/10" />
+          {/* Quick links */}
+          <div>
+            <h2 className="eyebrow text-brass/80">Liên kết</h2>
+            <ul className="mt-4 space-y-3 font-body text-sm">
+              <li>
+                <Link
+                  href="/articles"
+                  className="inline-flex items-center gap-2.5 text-paper/70 transition-colors hover:text-brass"
+                >
+                  <FileText className="h-4 w-4 shrink-0 text-brass/70" />
+                  Thông Báo Đấu Giá
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/about"
+                  className="text-paper/70 transition-colors hover:text-brass"
+                >
+                  Giới Thiệu Công Ty
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
 
-          {/* Copyright */}
-          <p className="font-body text-xs text-warm-white/40">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-paper/10 pt-6 text-center sm:flex-row sm:text-left">
+          <p className="font-body text-xs text-paper/45">
             &copy; {year} {COMPANY.legalName}. Bản quyền thuộc về công ty.
+          </p>
+          <p className="font-body text-xs text-paper/45">
+            Thông tin đấu giá được công bố theo quy định pháp luật.
           </p>
         </div>
       </div>

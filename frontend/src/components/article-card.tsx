@@ -1,7 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Eye } from "lucide-react";
-import { cn, formatDate } from "@/lib/utils";
+import { Eye, MapPin, CalendarClock, Gavel, Landmark } from "lucide-react";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import {
+  auctionStatus,
+  formatVnd,
+  formatLocation,
+} from "@/lib/auction";
+import { StatusBadge, readableTextOn } from "@/components/status-badge";
 
 export interface ArticleCardProps {
   article: {
@@ -16,77 +22,114 @@ export interface ArticleCardProps {
     categoryName: string | null;
     categorySlug: string | null;
     categoryColor: string | null;
+    province?: string | null;
+    district?: string | null;
+    ward?: string | null;
+    auctionStart?: string | null;
+    auctionEnd?: string | null;
+    startingPrice?: number | null;
   };
   className?: string;
   /**
    * Mark this card's image as the LCP candidate. Pass `true` for the first
-   * card in any above-the-fold grid so Next emits `fetchpriority="high"` and
-   * skips lazy-loading. Default `false` keeps every other card lazy.
+   * card in any above-the-fold grid so Next emits `fetchpriority="high"`.
    */
   priority?: boolean;
 }
 
 export function ArticleCard({ article, className, priority = false }: ArticleCardProps) {
+  const status = auctionStatus(article);
+  const location = formatLocation(article);
+  const price = formatVnd(article.startingPrice);
+  const hasFacts = Boolean(location || article.auctionStart || price);
+
   return (
     <Link
       href={`/articles/${article.slug}`}
       className={cn(
-        "group flex flex-col overflow-hidden rounded-lg border border-warm-border bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+        "group flex flex-col overflow-hidden rounded-xl border border-line bg-card transition-all duration-300 hover:-translate-y-0.5 hover:border-pine/30 hover:shadow-[0_12px_30px_-12px_rgba(18,47,35,0.25)]",
         className,
       )}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-video w-full overflow-hidden bg-charcoal">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-pine-pale">
         {article.thumbnailUrl ? (
           <Image
             src={article.thumbnailUrl}
             alt={article.title}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={priority}
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <span className="font-heading text-2xl font-bold text-warm-white/20">
-              ĐẤUGIÁ.
-            </span>
+          // Refined placeholder for notices without a cover — reads as an
+          // official document, not a broken image.
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,#EFF4EE,#E2ECE3)]">
+            <Landmark className="h-8 w-8 text-pine/35" strokeWidth={1.5} />
+            <span className="eyebrow text-pine/50">Thông báo đấu giá</span>
           </div>
         )}
 
-        {/* Category badge */}
         {article.categoryName && (
           <span
-            className="absolute left-3 top-3 rounded-full px-3 py-1 font-body text-xs font-semibold text-white"
+            className="absolute left-3 top-3 rounded-md px-2.5 py-1 font-body text-[0.6875rem] font-semibold shadow-sm"
             style={{
-              backgroundColor: article.categoryColor || "#A16207",
+              backgroundColor: article.categoryColor || "#1B4332",
+              color: readableTextOn(article.categoryColor),
             }}
           >
             {article.categoryName}
           </span>
         )}
+        {status.key !== "none" && (
+          <StatusBadge
+            status={status}
+            className="absolute right-3 top-3 bg-card/95 shadow-sm backdrop-blur"
+          />
+        )}
       </div>
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-4">
-        {/* Title */}
-        <h3 className="line-clamp-2 font-heading text-xl font-semibold text-charcoal transition-colors group-hover:text-gold">
+        <h3 className="line-clamp-2 font-heading text-lg font-semibold leading-snug text-ink transition-colors group-hover:text-pine">
           {article.title}
         </h3>
 
-        {/* Description */}
-        {article.description && (
-          <p className="mt-2 line-clamp-2 font-body text-sm text-muted-fg">
-            {article.description}
-          </p>
+        {/* Fact strip — the "docket" */}
+        {hasFacts ? (
+          <dl className="mt-3 space-y-1.5">
+            {location && (
+              <Fact icon={<MapPin className="h-3.5 w-3.5" />}>
+                <span className="line-clamp-1">{location}</span>
+              </Fact>
+            )}
+            {article.auctionStart && (
+              <Fact icon={<CalendarClock className="h-3.5 w-3.5" />}>
+                <span className="data text-ink">
+                  {formatDateTime(article.auctionStart)}
+                </span>
+              </Fact>
+            )}
+            {price && (
+              <Fact icon={<Gavel className="h-3.5 w-3.5" />}>
+                <span className="data font-semibold text-pine">{price}</span>
+                <span className="ml-1 text-ink-faint">giá khởi điểm</span>
+              </Fact>
+            )}
+          </dl>
+        ) : (
+          article.description && (
+            <p className="mt-2 line-clamp-2 font-body text-sm text-ink-soft">
+              {article.description}
+            </p>
+          )
         )}
 
-        {/* Meta */}
-        <div className="mt-auto flex items-center gap-2 pt-4 font-body text-xs text-muted-fg">
-          <span>{article.authorName}</span>
-          <span>&middot;</span>
+        {/* Footer meta */}
+        <div className="mt-auto flex items-center gap-2 pt-4 font-body text-xs text-ink-faint">
           <span>{formatDate(article.publishedAt)}</span>
-          <span>&middot;</span>
+          <span aria-hidden>&middot;</span>
           <span className="inline-flex items-center gap-1">
             <Eye className="h-3.5 w-3.5" />
             {article.viewCount.toLocaleString("vi-VN")}
@@ -94,5 +137,20 @@ export function ArticleCard({ article, className, priority = false }: ArticleCar
         </div>
       </div>
     </Link>
+  );
+}
+
+function Fact({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <dd className="flex items-center gap-2 font-body text-[0.8125rem] text-ink-soft">
+      <span className="shrink-0 text-pine/60">{icon}</span>
+      {children}
+    </dd>
   );
 }

@@ -2,10 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Download, Eye, Calendar, User, FileText, Paperclip, MapPin, Clock, Wallet } from "lucide-react";
-import { publicFetch } from "@/lib/api";
+import {
+  Download,
+  Eye,
+  Calendar,
+  User,
+  FileText,
+  Paperclip,
+  MapPin,
+  Clock,
+  Wallet,
+  Gavel,
+  ChevronRight,
+  ListTree,
+} from "lucide-react";
+import { publicFetch, ApiError } from "@/lib/api";
 import type { Article } from "@/lib/api";
-import { formatDate, formatFileSize } from "@/lib/utils";
+import { formatDate, formatDateTime, formatFileSize } from "@/lib/utils";
+import { auctionStatus, formatVnd } from "@/lib/auction";
+import { StatusBadge, readableTextOn } from "@/components/status-badge";
 import { ViewTracker } from "@/components/view-tracker";
 import { COMPANY } from "@/lib/company";
 
@@ -21,8 +36,12 @@ async function getArticle(slug: string): Promise<Article | null> {
   try {
     const res = await publicFetch<{ data: Article }>(`/api/articles/${slug}`);
     return res.data;
-  } catch {
-    return null;
+  } catch (err) {
+    // Only treat a genuine 404 as "not found". For any other error (upstream
+    // 5xx, network) rethrow so a failed ISR render preserves the last good
+    // cached page instead of caching a 404 across the whole catalog.
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
   }
 }
 
@@ -127,41 +146,48 @@ function fileExtensionLabel(
   return "";
 }
 
-/**
- * Extract headings from HTML content for table of contents.
- */
-function extractHeadings(
-  html: string
-): { id: string; text: string; level: number }[] {
-  const headings: { id: string; text: string; level: number }[] = [];
-  const regex = /<h([2-3])[^>]*>(.*?)<\/h[2-3]>/gi;
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    const level = parseInt(match[1], 10);
-    const text = match[2].replace(/<[^>]*>/g, "").trim();
-    const id = text
+// Vietnamese-safe heading slug: transliterate diacritics (đ→d, strip combining
+// marks) instead of dropping them — "Đấu Giá Quyền" → "dau-gia-quyen", not a
+// garbled "u-gi-quyn". Falls back to "muc" if a heading is all punctuation.
+function slugifyHeading(text: string): string {
+  const base =
+    text
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
       .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
       .replace(/\s+/g, "-")
-      .slice(0, 60);
-    headings.push({ id, text, level });
-  }
-  return headings;
+      .slice(0, 60) || "muc";
+  return base;
 }
 
 /**
- * Inject IDs into heading tags for anchor links.
+ * Single pass over the content: inject stable, unique, Vietnamese-safe ids into
+ * h2/h3 tags AND return the matching table-of-contents list. Doing both here
+ * (with one de-dupe counter) guarantees the anchors and TOC links stay in sync.
  */
-function injectHeadingIds(html: string): string {
-  return html.replace(/<h([2-3])([^>]*)>(.*?)<\/h[2-3]>/gi, (_, level, attrs, content) => {
-    const text = content.replace(/<[^>]*>/g, "").trim();
-    const id = text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .slice(0, 60);
-    return `<h${level}${attrs} id="${id}">${content}</h${level}>`;
-  });
+function processContent(html: string): {
+  html: string;
+  headings: { id: string; text: string; level: number }[];
+} {
+  const headings: { id: string; text: string; level: number }[] = [];
+  const seen = new Map<string, number>();
+  const out = html.replace(
+    /<h([2-3])([^>]*)>(.*?)<\/h[2-3]>/gi,
+    (_, level, attrs, content) => {
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      let id = slugifyHeading(text);
+      const n = seen.get(id) ?? 0;
+      seen.set(id, n + 1);
+      if (n > 0) id = `${id}-${n + 1}`;
+      headings.push({ id, text, level: parseInt(level, 10) });
+      return `<h${level}${attrs} id="${id}">${content}</h${level}>`;
+    },
+  );
+  return { html: out, headings };
 }
 
 export default async function ArticleDetailPage({ params }: ArticlePageProps) {
@@ -173,16 +199,40 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
 
   const related = await getRelatedArticles(article.categorySlug, article.id);
 
-  const contentHtml = article.contentHtml
-    ? injectHeadingIds(article.contentHtml)
-    : "";
-  const headings = article.contentHtml
-    ? extractHeadings(article.contentHtml)
-    : [];
+  const { html: contentHtml, headings } = article.contentHtml
+    ? processContent(article.contentHtml)
+    : { html: "", headings: [] };
 
   const images = article.images || [];
   const attachments = article.attachments || [];
   const tags = article.tags || [];
+
+  // Auction docket derived values
+  const status = auctionStatus(article);
+  const startingPrice = formatVnd(article.startingPrice);
+  const depositAmount = formatVnd(article.depositAmount);
+  const venueText = [article.venueName, article.venueAddress]
+    .filter(Boolean)
+    .join(", ");
+  const hasAuctionInfo = Boolean(
+    article.auctionStart ||
+      venueText ||
+      startingPrice ||
+      depositAmount ||
+      article.province ||
+      article.district ||
+      article.ward,
+  );
+  // The listing only supports filtering by province, so every location chip
+  // links to the article's province (not the ward/district's own value, which
+  // would produce an empty `?province=<ward>` result). When there's no province
+  // the chips render as plain, non-linked labels.
+  const provinceHref = article.province
+    ? `/articles?province=${encodeURIComponent(article.province)}`
+    : null;
+  const locationChips = [article.ward, article.district, article.province]
+    .filter((v): v is string => Boolean(v))
+    .map((label, i) => ({ label, key: `${i}-${label}` }));
 
   // JSON-LD structured data — Article + BreadcrumbList graph (+ Event when set)
   const articleUrl = `${COMPANY.url}/articles/${article.slug}`;
@@ -284,26 +334,52 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
       />
       <ViewTracker articleId={article.id} />
 
-      <div className="container-wide py-10">
-        <div className="lg:grid lg:grid-cols-[220px_1fr_260px] lg:gap-8">
+      {/* Breadcrumb */}
+      <div className="border-b border-line bg-card">
+        <nav
+          aria-label="Breadcrumb"
+          className="container-wide flex items-center gap-1.5 overflow-x-auto py-3 font-body text-xs text-ink-faint no-scrollbar"
+        >
+          <Link href="/" className="shrink-0 hover:text-pine">Trang chủ</Link>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <Link href="/articles" className="shrink-0 hover:text-pine">Thông báo</Link>
+          {article.categoryName && article.categorySlug && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              <Link
+                href={`/categories/${article.categorySlug}`}
+                className="shrink-0 hover:text-pine"
+              >
+                {article.categoryName}
+              </Link>
+            </>
+          )}
+        </nav>
+      </div>
+
+      <div className="container-wide py-8 lg:py-10">
+        <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_260px] lg:gap-10">
           {/* Left sidebar — Table of Contents (desktop) */}
           <aside className="hidden lg:block">
             {headings.length > 0 && (
               <nav className="sticky top-20">
-                <h4 className="font-heading text-sm font-semibold uppercase tracking-wider text-charcoal">
-                  Mục Lục
-                </h4>
-                <ul className="mt-3 space-y-2 border-l border-warm-border pl-4">
+                <h2 className="eyebrow flex items-center gap-1.5 text-pine">
+                  <ListTree className="h-3.5 w-3.5" />
+                  Mục lục
+                </h2>
+                <ul className="mt-3 space-y-1.5 border-l border-line pl-4">
                   {headings.map((h) => (
                     <li key={h.id}>
                       <a
                         href={`#${h.id}`}
-                        className={`block font-body text-sm text-muted-fg transition-colors hover:text-gold ${
-                          h.level === 3 ? "pl-3" : ""
+                        className={`block font-body text-[0.8125rem] leading-snug text-ink-soft transition-colors hover:text-pine ${
+                          h.level === 3 ? "pl-3 text-ink-faint" : ""
                         }`}
                       >
                         {h.text}
@@ -316,144 +392,155 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           </aside>
 
           {/* Main content column */}
-          <div className="min-w-0 max-w-3xl">
+          <div className="min-w-0">
             {/* Article header */}
             <header className="mb-8">
-              {/* Category badge */}
-              {article.categoryName && article.categorySlug && (
-                <Link
-                  href={`/categories/${article.categorySlug}`}
-                  className="inline-block rounded-full px-3 py-1 font-body text-xs font-semibold text-white transition-opacity hover:opacity-80"
-                  style={{
-                    backgroundColor: article.categoryColor || "#A16207",
-                  }}
-                >
-                  {article.categoryName}
-                </Link>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {article.categoryName && article.categorySlug && (
+                  <Link
+                    href={`/categories/${article.categorySlug}`}
+                    className="inline-block rounded-md px-2.5 py-1 font-body text-[0.6875rem] font-semibold transition-opacity hover:opacity-90"
+                    style={{
+                      backgroundColor: article.categoryColor || "#1B4332",
+                      color: readableTextOn(article.categoryColor),
+                    }}
+                  >
+                    {article.categoryName}
+                  </Link>
+                )}
+                <StatusBadge status={status} />
+              </div>
 
-              <h1 className="mt-4 font-heading text-3xl font-bold leading-tight text-charcoal sm:text-4xl">
+              <h1 className="mt-4 font-heading text-3xl font-bold leading-[1.15] text-ink sm:text-[2.5rem]">
                 {article.title}
               </h1>
 
-              {article.description && (
-                <p className="mt-4 border-l-4 border-gold/30 pl-4 font-body text-base text-charcoal-light leading-relaxed italic">
-                  {article.description}
-                </p>
-              )}
-
               {/* Meta bar */}
-              <div className="mt-6 flex flex-wrap items-center gap-4 border-y border-warm-border py-4 font-body text-sm text-muted-fg">
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-line py-3 font-body text-sm text-ink-soft">
                 <span className="inline-flex items-center gap-1.5">
-                  <User className="h-4 w-4" />
+                  <User className="h-4 w-4 text-ink-faint" />
                   {article.authorName}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" />
+                  <Calendar className="h-4 w-4 text-ink-faint" />
                   {formatDate(article.publishedAt)}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-4 w-4 text-ink-faint" />
                   {article.viewCount.toLocaleString("vi-VN")} lượt xem
                 </span>
               </div>
-
-              {/* Location metadata */}
-              {(article.province || article.district) && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {article.province && (
-                    <span className="inline-flex items-center rounded bg-stone-100 px-2.5 py-1 font-body text-xs text-charcoal">
-                      {article.province}
-                    </span>
-                  )}
-                  {article.district && (
-                    <span className="inline-flex items-center rounded bg-stone-100 px-2.5 py-1 font-body text-xs text-charcoal">
-                      {article.district}
-                    </span>
-                  )}
-                  {article.ward && (
-                    <span className="inline-flex items-center rounded bg-stone-100 px-2.5 py-1 font-body text-xs text-charcoal">
-                      {article.ward}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Auction details — visible block matching the Event JSON-LD.
-                  Google requires that structured data describes content the
-                  user can actually see on the page. */}
-              {article.auctionStart && (
-                <aside className="mt-6 rounded-lg border border-gold/40 bg-gold-pale/40 p-5">
-                  <h2 className="font-heading text-lg font-bold text-charcoal">
-                    Thông Tin Cuộc Đấu Giá
-                  </h2>
-                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="flex items-start gap-2">
-                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                      <div>
-                        <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
-                          Thời gian
-                        </dt>
-                        <dd className="font-body text-sm font-medium text-charcoal">
-                          {formatDate(article.auctionStart)}
-                          {article.auctionEnd && (
-                            <> – {formatDate(article.auctionEnd)}</>
-                          )}
-                        </dd>
-                      </div>
-                    </div>
-                    {(article.venueName || article.venueAddress) && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                        <div>
-                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
-                            Địa điểm
-                          </dt>
-                          <dd className="font-body text-sm font-medium text-charcoal">
-                            {article.venueName}
-                            {article.venueName && article.venueAddress && (
-                              <>, </>
-                            )}
-                            {article.venueAddress}
-                          </dd>
-                        </div>
-                      </div>
-                    )}
-                    {article.startingPrice != null && (
-                      <div className="flex items-start gap-2">
-                        <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                        <div>
-                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
-                            Giá khởi điểm
-                          </dt>
-                          <dd className="font-body text-sm font-medium text-charcoal">
-                            {article.startingPrice.toLocaleString("vi-VN")} VND
-                          </dd>
-                        </div>
-                      </div>
-                    )}
-                    {article.depositAmount != null && (
-                      <div className="flex items-start gap-2">
-                        <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                        <div>
-                          <dt className="font-body text-xs uppercase tracking-wider text-muted-fg">
-                            Tiền đặt trước
-                          </dt>
-                          <dd className="font-body text-sm font-medium text-charcoal">
-                            {article.depositAmount.toLocaleString("vi-VN")} VND
-                          </dd>
-                        </div>
-                      </div>
-                    )}
-                  </dl>
-                </aside>
-              )}
             </header>
+
+            {/* ── Auction docket — the key facts, above the fold ── */}
+            {hasAuctionInfo && (
+              <section
+                aria-label="Thông tin cuộc đấu giá"
+                className="mb-8 overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_3px_rgba(18,47,35,0.05)]"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-line bg-pine-pale/50 px-5 py-3">
+                  <h2 className="flex items-center gap-2 font-heading text-base font-bold text-pine">
+                    <Gavel className="h-4 w-4" />
+                    Thông tin cuộc đấu giá
+                  </h2>
+                  <StatusBadge status={status} />
+                </div>
+                <dl className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2">
+                  {article.auctionStart && (
+                    <DocketRow icon={<Clock className="h-4 w-4" />} label="Thời gian đấu giá">
+                      <span className="data text-ink">
+                        {formatDateTime(article.auctionStart)}
+                        {article.auctionEnd && (
+                          <> – {formatDateTime(article.auctionEnd)}</>
+                        )}
+                      </span>
+                    </DocketRow>
+                  )}
+                  {venueText && (
+                    <DocketRow icon={<MapPin className="h-4 w-4" />} label="Địa điểm đấu giá">
+                      <span className="text-ink">{venueText}</span>
+                    </DocketRow>
+                  )}
+                  {startingPrice && (
+                    <DocketRow icon={<Gavel className="h-4 w-4" />} label="Giá khởi điểm">
+                      <span className="data text-base font-semibold text-pine">
+                        {startingPrice}
+                      </span>
+                    </DocketRow>
+                  )}
+                  {depositAmount && (
+                    <DocketRow icon={<Wallet className="h-4 w-4" />} label="Tiền đặt trước">
+                      <span className="data font-medium text-ink">{depositAmount}</span>
+                    </DocketRow>
+                  )}
+                  {locationChips.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <dt className="eyebrow mb-1.5 flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-pine/60" />
+                        Vị trí tài sản
+                      </dt>
+                      <dd className="flex flex-wrap gap-2">
+                        {locationChips.map((chip) =>
+                          provinceHref ? (
+                            <Link
+                              key={chip.key}
+                              href={provinceHref}
+                              className="inline-flex items-center rounded-md bg-pine-pale px-2.5 py-1 font-body text-xs font-medium text-pine transition-colors hover:bg-pine hover:text-paper"
+                            >
+                              {chip.label}
+                            </Link>
+                          ) : (
+                            <span
+                              key={chip.key}
+                              className="inline-flex items-center rounded-md bg-pine-pale px-2.5 py-1 font-body text-xs font-medium text-pine"
+                            >
+                              {chip.label}
+                            </span>
+                          ),
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
+            )}
+
+            {/* Mobile Table of Contents */}
+            {headings.length > 0 && (
+              <details className="group mb-6 rounded-lg border border-line bg-card lg:hidden">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-body text-sm font-semibold text-ink">
+                  <ListTree className="h-4 w-4 text-pine" />
+                  Mục lục
+                  <ChevronRight className="ml-auto h-4 w-4 text-ink-faint transition-transform group-open:rotate-90" />
+                </summary>
+                <ul className="space-y-1 border-t border-line px-4 py-3">
+                  {headings.map((h) => (
+                    <li key={h.id}>
+                      <a
+                        href={`#${h.id}`}
+                        className={`block py-1 font-body text-sm text-ink-soft ${
+                          h.level === 3 ? "pl-3 text-ink-faint" : ""
+                        }`}
+                      >
+                        {h.text}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {/* Description lead */}
+            {article.description && (
+              <p className="mb-8 border-l-2 border-brass pl-4 font-heading text-lg leading-relaxed text-ink-soft">
+                {article.description}
+              </p>
+            )}
 
             {/* Article content */}
             {contentHtml && (
               <article
-                className="prose prose-lg prose-stone max-w-none font-document prose-document-table"
+                className="prose prose-lg max-w-none font-document prose-document-table prose-headings:font-heading"
                 dangerouslySetInnerHTML={{ __html: contentHtml }}
               />
             )}
@@ -461,14 +548,12 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
             {/* Image gallery */}
             {images.length > 0 && (
               <section className="mt-12">
-                <h2 className="font-heading text-2xl font-bold text-charcoal">
-                  Hình Ảnh
-                </h2>
+                <h2 className="font-heading text-xl font-bold text-ink">Hình ảnh</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   {images.map((img) => (
-                    <div
+                    <figure
                       key={img.id}
-                      className="overflow-hidden rounded-lg border border-warm-border"
+                      className="overflow-hidden rounded-lg border border-line"
                     >
                       <Image
                         src={img.url}
@@ -479,11 +564,11 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                         className="h-auto w-full object-cover"
                       />
                       {img.altText && (
-                        <p className="px-3 py-2 font-body text-xs text-muted-fg">
+                        <figcaption className="px-3 py-2 font-body text-xs text-ink-faint">
                           {img.altText}
-                        </p>
+                        </figcaption>
                       )}
-                    </div>
+                    </figure>
                   ))}
                 </div>
               </section>
@@ -492,9 +577,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
             {/* Attachments */}
             {attachments.length > 0 && (
               <section className="mt-12">
-                <h2 className="font-heading text-2xl font-bold text-charcoal">
-                  <Paperclip className="mr-2 inline-block h-5 w-5" />
-                  Tài Liệu Đính Kèm
+                <h2 className="flex items-center gap-2 font-heading text-xl font-bold text-ink">
+                  <Paperclip className="h-5 w-5 text-pine" />
+                  Tài liệu đính kèm
                 </h2>
                 <div className="mt-4 space-y-3">
                   {attachments.map((att) => (
@@ -503,19 +588,18 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                       href={att.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-4 rounded-lg border border-warm-border p-4 transition-colors hover:border-gold hover:bg-gold-pale/30"
+                      className="flex items-center gap-4 rounded-lg border border-line bg-card p-4 transition-colors hover:border-pine/40 hover:bg-pine-pale/40"
                     >
-                      <FileText className="h-8 w-8 shrink-0 text-muted-fg" />
+                      <FileText className="h-8 w-8 shrink-0 text-pine/60" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-body text-sm font-medium text-charcoal">
+                        <p className="truncate font-body text-sm font-medium text-ink">
                           {att.fileName}
                         </p>
-                        <p className="font-body text-xs text-muted-fg">
-                          {att.fileMime} &middot;{" "}
-                          {formatFileSize(att.sizeBytes)}
+                        <p className="font-body text-xs text-ink-faint">
+                          {att.fileMime} &middot; {formatFileSize(att.sizeBytes)}
                         </p>
                       </div>
-                      <Download className="h-4 w-4 shrink-0 text-gold" />
+                      <Download className="h-4 w-4 shrink-0 text-pine" />
                     </a>
                   ))}
                 </div>
@@ -529,7 +613,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                   <Link
                     key={tag.id}
                     href={`/tags/${tag.slug}`}
-                    className="inline-flex items-center rounded-full border border-warm-border px-3 py-1 font-body text-xs text-muted-fg transition-colors hover:border-gold hover:text-gold"
+                    className="inline-flex items-center rounded-md border border-line px-2.5 py-1 font-body text-xs text-ink-soft transition-colors hover:border-pine/40 hover:text-pine"
                   >
                     #{tag.name}
                   </Link>
@@ -537,20 +621,18 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
               </div>
             )}
 
-            {/* Original document download */}
+            {/* Original document download — prominent */}
             {article.originalFileName && (
-              <section className="mt-12 rounded-lg border border-warm-border bg-warm-white p-6">
+              <section className="mt-12 overflow-hidden rounded-xl border border-line bg-gradient-to-br from-pine-pale/60 to-card p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gold-pale">
-                      <FileText className="h-5 w-5 text-gold" />
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-pine text-paper">
+                      <FileText className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-heading text-sm font-semibold text-charcoal">
-                        Tài Liệu Gốc
-                      </p>
+                      <p className="eyebrow text-brass-ink">Tài liệu gốc</p>
                       <p
-                        className="truncate font-body text-xs text-muted-fg"
+                        className="truncate font-body text-sm font-medium text-ink"
                         title={article.originalFileName}
                       >
                         {article.originalFileName}
@@ -559,22 +641,45 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                   </div>
                   <a
                     href={`/api/articles/${article.slug}/download`}
-                    className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-md bg-charcoal px-5 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-gold"
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-pine px-6 py-3 font-body text-sm font-semibold text-paper transition-colors hover:bg-brass"
                   >
                     <Download className="h-4 w-4" />
-                    Tải Xuống
+                    Tải xuống
                     {fileExtensionLabel(
                       article.originalFileName,
-                      article.originalFileMime
+                      article.originalFileMime,
                     ) && (
-                      <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      <span className="rounded bg-paper/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                         {fileExtensionLabel(
                           article.originalFileName,
-                          article.originalFileMime
+                          article.originalFileMime,
                         )}
                       </span>
                     )}
                   </a>
+                </div>
+              </section>
+            )}
+
+            {/* Related — mobile (below content) */}
+            {related.length > 0 && (
+              <section className="mt-12 border-t border-line pt-8 lg:hidden">
+                <h2 className="eyebrow text-pine">Bài viết liên quan</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {related.map((rel) => (
+                    <Link
+                      key={rel.id}
+                      href={`/articles/${rel.slug}`}
+                      className="group rounded-lg border border-line bg-card p-4 transition-colors hover:border-pine/30"
+                    >
+                      <h3 className="line-clamp-3 font-heading text-sm font-semibold leading-snug text-ink transition-colors group-hover:text-pine">
+                        {rel.title}
+                      </h3>
+                      <p className="mt-2 font-body text-xs text-ink-faint">
+                        {formatDate(rel.publishedAt)}
+                      </p>
+                    </Link>
+                  ))}
                 </div>
               </section>
             )}
@@ -584,20 +689,18 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           <aside className="hidden lg:block">
             {related.length > 0 && (
               <div className="sticky top-20">
-                <h4 className="font-heading text-sm font-semibold uppercase tracking-wider text-charcoal">
-                  Bài Viết Liên Quan
-                </h4>
+                <h2 className="eyebrow text-pine">Bài viết liên quan</h2>
                 <div className="mt-4 space-y-4">
                   {related.map((rel) => (
                     <Link
                       key={rel.id}
                       href={`/articles/${rel.slug}`}
-                      className="group block"
+                      className="group block border-l-2 border-line pl-3 transition-colors hover:border-brass"
                     >
-                      <h5 className="font-heading text-sm font-semibold leading-snug text-charcoal transition-colors group-hover:text-gold line-clamp-3">
+                      <h3 className="line-clamp-3 font-heading text-sm font-semibold leading-snug text-ink transition-colors group-hover:text-pine">
                         {rel.title}
-                      </h5>
-                      <p className="mt-1 font-body text-xs text-muted-fg">
+                      </h3>
+                      <p className="mt-1 font-body text-xs text-ink-faint">
                         {formatDate(rel.publishedAt)}
                       </p>
                     </Link>
@@ -609,5 +712,25 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
         </div>
       </div>
     </>
+  );
+}
+
+function DocketRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="eyebrow mb-1 flex items-center gap-1.5">
+        <span className="text-pine/60">{icon}</span>
+        {label}
+      </dt>
+      <dd className="font-body text-sm">{children}</dd>
+    </div>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   clientFetch,
+  revalidatePublic,
   type Article,
   type Category,
   type ArticleImage,
@@ -67,6 +68,7 @@ export default function EditArticlePage() {
   const [activeTab, setActiveTab] = useState<Tab>("content");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [statusChanging, setStatusChanging] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -104,6 +106,18 @@ export default function EditArticlePage() {
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [attachmentDragging, setAttachmentDragging] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  // refreshMedia reloads only the image/attachment lists — used after uploads and
+  // deletes so they never clobber unsaved edits in the content-tab form fields.
+  const refreshMedia = useCallback(async () => {
+    try {
+      const res = await clientFetch<{ data: Article }>(`/admin/articles/${id}`);
+      setImages(res.data.images || []);
+      setAttachments(res.data.attachments || []);
+    } catch {
+      // non-fatal; the media list just won't refresh
+    }
+  }, [id]);
 
   const loadArticle = useCallback(async () => {
     try {
@@ -198,16 +212,17 @@ export default function EditArticlePage() {
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append("file", file);
-        await fetch(`/api/admin/articles/${id}/images`, {
+        const r = await fetch(`/api/admin/articles/${id}/images`, {
           method: "POST",
           credentials: "include",
           body: formData,
-        }).then((r) => {
-          if (!r.ok) throw new Error("Tải ảnh thất bại");
-          return r.json();
         });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || "Tải ảnh thất bại");
+        }
       }
-      await loadArticle();
+      await refreshMedia();
       showSuccess("Tải ảnh thành công");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tải ảnh thất bại");
@@ -246,16 +261,17 @@ export default function EditArticlePage() {
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append("file", file);
-        await fetch(`/api/admin/articles/${id}/attachments`, {
+        const r = await fetch(`/api/admin/articles/${id}/attachments`, {
           method: "POST",
           credentials: "include",
           body: formData,
-        }).then((r) => {
-          if (!r.ok) throw new Error("Tải file thất bại");
-          return r.json();
         });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || "Tải file thất bại");
+        }
       }
-      await loadArticle();
+      await refreshMedia();
       showSuccess("Tải file thành công");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tải file thất bại");
@@ -290,37 +306,38 @@ export default function EditArticlePage() {
   }
 
   // --- Publish tab ---
-  async function handlePublish() {
+  // Guards all status changes with a single in-flight flag so the buttons can't
+  // be double-clicked into a publish→unpublish race on a slow connection.
+  async function changeStatus(
+    action: "publish" | "unpublish" | "archive",
+    okMsg: string,
+    failMsg: string,
+  ) {
+    if (statusChanging) return;
+    setStatusChanging(true);
     setError("");
     try {
-      await clientFetch(`/admin/articles/${id}/publish`, { method: "POST" });
+      await clientFetch(`/admin/articles/${id}/${action}`, { method: "POST" });
       await loadArticle();
-      showSuccess("Đã xuất bản bài viết");
+      await revalidatePublic({ slug: article?.slug, categorySlug: article?.categorySlug });
+      showSuccess(okMsg);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Xuất bản thất bại");
+      setError(err instanceof Error ? err.message : failMsg);
+    } finally {
+      setStatusChanging(false);
     }
+  }
+
+  async function handlePublish() {
+    await changeStatus("publish", "Đã xuất bản bài viết", "Xuất bản thất bại");
   }
 
   async function handleUnpublish() {
-    setError("");
-    try {
-      await clientFetch(`/admin/articles/${id}/unpublish`, { method: "POST" });
-      await loadArticle();
-      showSuccess("Đã gỡ xuất bản");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật thất bại");
-    }
+    await changeStatus("unpublish", "Đã gỡ xuất bản", "Cập nhật thất bại");
   }
 
   async function handleArchive() {
-    setError("");
-    try {
-      await clientFetch(`/admin/articles/${id}/archive`, { method: "POST" });
-      await loadArticle();
-      showSuccess("Đã lưu trữ bài viết");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật thất bại");
-    }
+    await changeStatus("archive", "Đã lưu trữ bài viết", "Cập nhật thất bại");
   }
 
   // Drag handlers for images
@@ -944,7 +961,8 @@ export default function EditArticlePage() {
                 <button
                   type="button"
                   onClick={handlePublish}
-                  className="flex items-center gap-2 rounded-md bg-green-600 px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-green-700"
+                  className="flex items-center gap-2 rounded-md bg-green-600 px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                  disabled={statusChanging}
                 >
                   <Globe className="h-4 w-4" />
                   Xuất Bản
@@ -954,7 +972,8 @@ export default function EditArticlePage() {
                 <button
                   type="button"
                   onClick={handleUnpublish}
-                  className="flex items-center gap-2 rounded-md border border-warm-border bg-white px-4 py-2.5 font-body text-sm font-medium text-charcoal transition-colors hover:bg-warm-white"
+                  className="flex items-center gap-2 rounded-md border border-warm-border bg-white px-4 py-2.5 font-body text-sm font-medium text-charcoal transition-colors hover:bg-warm-white disabled:opacity-50"
+                  disabled={statusChanging}
                 >
                   <EyeOff className="h-4 w-4" />
                   Gỡ Xuất Bản
@@ -964,7 +983,8 @@ export default function EditArticlePage() {
                 <button
                   type="button"
                   onClick={handleArchive}
-                  className="flex items-center gap-2 rounded-md border border-warm-border bg-white px-4 py-2.5 font-body text-sm font-medium text-muted-fg transition-colors hover:bg-warm-white"
+                  className="flex items-center gap-2 rounded-md border border-warm-border bg-white px-4 py-2.5 font-body text-sm font-medium text-muted-fg transition-colors hover:bg-warm-white disabled:opacity-50"
+                  disabled={statusChanging}
                 >
                   <Archive className="h-4 w-4" />
                   Lưu Trữ

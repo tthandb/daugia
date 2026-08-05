@@ -2,17 +2,23 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/daugia999/backend/internal/db"
 	"github.com/daugia999/backend/internal/parser"
@@ -256,12 +262,14 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 
 	articleID := cuid.New()
 
-	// Upload raw file to MinIO
+	// Upload raw file to object storage. If this fails we must NOT create the
+	// article row — otherwise the notice would appear published while its source
+	// document was never stored (permanent data loss).
 	rawKey := fmt.Sprintf("raw/%s%s", articleID, ext)
-	rawFile, _ := os.Open(tmpFile)
-	stat, _ := rawFile.Stat()
-	_ = h.store.Upload(ctx, rawKey, rawFile, stat.Size(), mime)
-	rawFile.Close()
+	if _, err := h.uploadLocalFile(ctx, rawKey, tmpFile, mime); err != nil {
+		writeError(w, http.StatusBadGateway, "failed to store document; article not created")
+		return
+	}
 
 	// Create thumbnail via bimg (if we can)
 	// For document uploads, thumbnail is generated later or from first page
@@ -283,31 +291,51 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 	totalArea := nilStr(r.FormValue("totalArea"))
 
-	article, err := h.queries.CreateArticle(ctx, db.CreateArticleParams{
-		ID:               articleID,
-		Title:            title,
-		Slug:             slug,
-		Description:      description,
-		AuthorName:       authorName,
-		ContentHtml:      contentHTML,
-		ContentPlain:     contentPlain,
-		Status:           "DRAFT",
-		Province:         province,
-		District:         district,
-		Ward:             ward,
-		AssetType:        assetType,
-		PlotCount:        plotCount,
-		TotalArea:        totalArea,
-		ThumbnailKey:     nil,
-		OriginalFileKey:  &rawKey,
-		OriginalFileName: &originalFileName,
-		OriginalFileMime: &mime,
-		LegacyID:         pgtype.Int4{},
-		LegacyFileKey:    nil,
-		CategoryID:       categoryID,
-		PublishedAt:      nil,
-	})
+	baseSlug := slug
+	var article db.CreateArticleRow
+	err = nil
+	for attempt := 0; attempt < 5; attempt++ {
+		candidate := baseSlug
+		if attempt > 0 {
+			candidate = fmt.Sprintf("%s-%d", baseSlug, attempt+1)
+		}
+		article, err = h.queries.CreateArticle(ctx, db.CreateArticleParams{
+			ID:               articleID,
+			Title:            title,
+			Slug:             candidate,
+			Description:      description,
+			AuthorName:       authorName,
+			ContentHtml:      contentHTML,
+			ContentPlain:     contentPlain,
+			Status:           "DRAFT",
+			Province:         province,
+			District:         district,
+			Ward:             ward,
+			AssetType:        assetType,
+			PlotCount:        plotCount,
+			TotalArea:        totalArea,
+			ThumbnailKey:     nil,
+			OriginalFileKey:  &rawKey,
+			OriginalFileName: &originalFileName,
+			OriginalFileMime: &mime,
+			LegacyID:         pgtype.Int4{},
+			LegacyFileKey:    nil,
+			CategoryID:       categoryID,
+			PublishedAt:      nil,
+		})
+		if err == nil {
+			break
+		}
+		if !isUniqueViolation(err) {
+			break // a non-collision error — don't keep retrying
+		}
+	}
 	if err != nil {
+		// The raw document was already uploaded; remove it so a failed create
+		// doesn't leave an orphaned (billable) object in storage.
+		if delErr := h.store.Delete(ctx, rawKey); delErr != nil {
+			log.Printf("failed to clean up orphaned upload %s: %v", rawKey, delErr)
+		}
 		writeError(w, 500, fmt.Sprintf("failed to create article: %v", err))
 		return
 	}
@@ -506,18 +534,45 @@ func extFromMime(mime string) string {
 	}
 }
 
+// isUniqueViolation reports whether err is a Postgres unique-constraint error
+// (SQLSTATE 23505), used to retry slug generation on collision.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// slugifyTitle produces a URL-safe slug from a Vietnamese title. Diacritics are
+// transliterated to their base ASCII letter (NFD + strip combining marks) rather
+// than dropped, so "Thông báo đấu giá" becomes "thong-bao-dau-gia" instead of a
+// mangled, collision-prone "thng-bo-u-gi".
 func slugifyTitle(title string) string {
-	s := title
-	// Simple slugification
-	var result []byte
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			result = append(result, byte(r))
-		} else if r >= 'A' && r <= 'Z' {
-			result = append(result, byte(r+32))
-		} else if r == ' ' {
-			result = append(result, '-')
+	// Decompose accented runes into base letter + combining marks, then drop the marks.
+	decomposed := norm.NFD.String(title)
+
+	var b strings.Builder
+	prevDash := false
+	for _, r := range decomposed {
+		if unicode.Is(unicode.Mn, r) { // Mn = nonspacing combining mark
+			continue
+		}
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevDash = false
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r + 32)
+			prevDash = false
+		case r == 'đ' || r == 'Đ':
+			b.WriteByte('d')
+			prevDash = false
+		case r == ' ' || r == '-' || r == '_':
+			if !prevDash && b.Len() > 0 {
+				b.WriteByte('-')
+				prevDash = true
+			}
+		default:
+			// drop other punctuation/symbols
 		}
 	}
-	return string(result)
+	return strings.Trim(b.String(), "-")
 }
