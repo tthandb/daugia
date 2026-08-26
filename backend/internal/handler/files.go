@@ -155,6 +155,7 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 	sortOrder := int32(len(existingImages))
 
 	var results []map[string]any
+	var firstKey string
 
 	for _, fh := range files {
 		// Validate MIME
@@ -224,6 +225,9 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 			SortOrder: sortOrder,
 		})
 		if err == nil {
+			if firstKey == "" {
+				firstKey = key
+			}
 			results = append(results, map[string]any{
 				"id":       img.ID,
 				"url":      fmt.Sprintf("/api/images/%s", img.ID),
@@ -237,6 +241,21 @@ func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 		}
 
 		os.RemoveAll(tmpDir)
+	}
+
+	// A scanned PDF yields no cover, so the article keeps a NULL thumbnail_key:
+	// the card falls back to a placeholder and JSON-LD drops Article/Event
+	// `image`, which Google wants. Adopt the first gallery image as the cover
+	// when none is set; an existing cover is never overwritten.
+	if firstKey != "" {
+		if a, err := h.queries.GetArticleByID(ctx, articleID); err == nil && a.ThumbnailKey == nil {
+			if _, err := h.queries.UpdateArticle(ctx, db.UpdateArticleParams{
+				ID:           articleID,
+				ThumbnailKey: &firstKey,
+			}); err != nil {
+				fmt.Printf("failed to adopt cover image for article %s: %v\n", articleID, err)
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{"data": results})
