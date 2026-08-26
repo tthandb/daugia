@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import {
   MapPin,
   Phone,
-  FileText,
   Calendar,
   User,
   Building2,
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
   title: "Giới Thiệu",
   description:
     `${COMPANY.legalName} — công ty đấu giá hợp danh tại ${COMPANY.address.region}. ` +
-    `Thành lập ${COMPANY.founded}, MST ${COMPANY.taxId}, đại diện ${COMPANY.representative}.`,
+    `Thành lập ${COMPANY.founded}, đại diện ${COMPANY.representative}.`,
   alternates: { canonical: "/about" },
   openGraph: {
     url: `${COMPANY.url}/about`,
@@ -46,7 +45,6 @@ const formattedFounded = new Date(COMPANY.founded).toLocaleDateString("vi-VN", {
 
 const infoRows: { icon: typeof MapPin; label: string; value: string }[] = [
   { icon: Building2, label: "Tên đầy đủ", value: COMPANY.legalNameUpper },
-  { icon: FileText, label: "Mã số thuế", value: COMPANY.taxId },
   { icon: Calendar, label: "Ngày thành lập", value: formattedFounded },
   { icon: User, label: "Người đại diện", value: COMPANY.representative },
   { icon: Phone, label: "Điện thoại", value: COMPANY.phoneDisplay },
@@ -83,11 +81,7 @@ const services = [
 const faqs = [
   {
     q: "Công ty Đấu giá Hợp danh Vĩnh Yên được thành lập khi nào?",
-    a: "Công ty được thành lập ngày 04/09/2019 theo giấy chứng nhận đăng ký doanh nghiệp số 2500634576 do Sở Kế hoạch và Đầu tư cấp, hoạt động dưới hình thức công ty đấu giá hợp danh.",
-  },
-  {
-    q: "Mã số thuế của công ty là gì?",
-    a: "Mã số thuế: 2500634576. Có thể tra cứu công khai tại masothue.com.",
+    a: "Công ty được thành lập ngày 04/09/2019 theo giấy chứng nhận đăng ký doanh nghiệp do Sở Kế hoạch và Đầu tư cấp, hoạt động dưới hình thức công ty đấu giá hợp danh.",
   },
   {
     q: "Khu vực hoạt động đấu giá của công ty là ở đâu?",
@@ -214,8 +208,7 @@ export default function AboutPage() {
           <div className="prose prose-stone mt-6 max-w-none font-body text-charcoal-light">
             <p>
               <strong>{COMPANY.legalName}</strong> (tên pháp lý:{" "}
-              <em>{COMPANY.legalNameUpper}</em>, mã số thuế{" "}
-              <strong>{COMPANY.taxId}</strong>) là công ty đấu giá hợp danh
+              <em>{COMPANY.legalNameUpper}</em>) là công ty đấu giá hợp danh
               được thành lập ngày {formattedFounded}, hoạt động hợp pháp theo{" "}
               <strong>Luật Đấu giá tài sản 2016</strong> và các quy định pháp
               luật có liên quan của nước Cộng hoà Xã hội Chủ nghĩa Việt Nam.

@@ -27,7 +27,7 @@ export function Footer() {
               động sản và quyền sử dụng đất tại {COMPANY.address.region}.
             </p>
             <p className="mt-4 font-mono text-xs tracking-tight text-paper/50">
-              MST {COMPANY.taxId} · Đại diện {COMPANY.representative}
+              Đại diện {COMPANY.representative}
             </p>
           </div>
 

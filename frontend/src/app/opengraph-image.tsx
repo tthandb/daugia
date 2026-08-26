@@ -99,7 +99,6 @@ export default async function Image() {
           }}
         >
           <span>{domain}</span>
-          <span style={{ color: "#78716C" }}>MST {COMPANY.taxId}</span>
         </div>
       </div>
     ),

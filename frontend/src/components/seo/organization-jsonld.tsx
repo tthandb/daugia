@@ -14,7 +14,6 @@ export function OrganizationJsonLd() {
         logo: `${COMPANY.url}/icon`,
         image: `${COMPANY.url}/opengraph-image`,
         telephone: COMPANY.phoneTel,
-        taxID: COMPANY.taxId,
         foundingDate: COMPANY.founded,
         founder: {
           "@type": "Person",
@@ -44,7 +43,7 @@ export function OrganizationJsonLd() {
           opens: spec.opens,
           closes: spec.closes,
         })),
-        sameAs: COMPANY.sameAs,
+        ...(COMPANY.sameAs.length > 0 && { sameAs: COMPANY.sameAs }),
         hasMap: mapsSearchUrl(),
         additionalType: "https://en.wikipedia.org/wiki/Auction_house",
         knowsAbout: [

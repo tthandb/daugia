@@ -36,13 +36,12 @@ export async function GET() {
 
   const body = `# ${COMPANY.legalName}
 
-> ${COMPANY.tagline}. ${COMPANY.legalName} (MST ${COMPANY.taxId}, thành lập ${COMPANY.founded}, đại diện ${COMPANY.representative}) là công ty đấu giá hợp danh hoạt động tại ${COMPANY.address.region}.
+> ${COMPANY.tagline}. ${COMPANY.legalName} (thành lập ${COMPANY.founded}, đại diện ${COMPANY.representative}) là công ty đấu giá hợp danh hoạt động tại ${COMPANY.address.region}.
 
 ## Thông tin công ty
 - [Giới thiệu](${COMPANY.url}/about)
 - Địa chỉ: ${COMPANY.address.full}
 - Điện thoại: ${COMPANY.phoneDisplay}
-- Mã số thuế: ${COMPANY.taxId}
 
 ## Thông báo đấu giá
 - [Toàn bộ thông báo](${COMPANY.url}/articles)

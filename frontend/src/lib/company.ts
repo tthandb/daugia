@@ -7,7 +7,6 @@ export const COMPANY = {
   shortName: "Đấu Giá Vĩnh Yên",
   brandMark: "ĐẤUGIÁ.",
   tagline: "Đấu giá bất động sản Phú Thọ",
-  taxId: "2500634576",
   phoneDisplay: "0912 535 999",
   phoneTel: "+84912535999",
   founded: "2019-09-04",
@@ -32,9 +31,7 @@ export const COMPANY = {
     { days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "17:00" },
   ],
   // Off-site identity references — populate as profiles are claimed.
-  sameAs: [
-    `https://masothue.com/${"2500634576"}-cong-ty-dau-gia-hop-danh-vinh-yen`,
-  ],
+  sameAs: [] as string[],
   // Service area — tỉnh Phú Thọ after the 2025 administrative merger that
   // absorbed the former tỉnh Vĩnh Phúc. We keep a single AdministrativeArea;
   // the historical "Vĩnh Phúc" surfaces as a search keyword (see layout.tsx).
