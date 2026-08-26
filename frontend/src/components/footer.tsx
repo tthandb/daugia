@@ -87,9 +87,18 @@ export function Footer() {
           <p className="font-body text-xs text-paper/45">
             &copy; {year} {COMPANY.legalName}. Bản quyền thuộc về công ty.
           </p>
-          <p className="font-body text-xs text-paper/45">
-            Thông tin đấu giá được công bố theo quy định pháp luật.
-          </p>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
+            <p className="font-body text-xs text-paper/45">
+              Thông tin đấu giá được công bố theo quy định pháp luật.
+            </p>
+            <Link
+              href="/login"
+              rel="nofollow"
+              className="font-body text-xs text-paper/35 transition-colors hover:text-brass"
+            >
+              Quản trị
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
