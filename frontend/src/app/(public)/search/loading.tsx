@@ -1,5 +1,7 @@
-// Lightweight route-transition skeleton for public pages. Mirrors the listing
-// grid so the layout doesn't jump when content arrives.
+// Skeleton for the search results grid. Deliberately scoped to /search rather
+// than the whole (public) group: a loading boundary above a route that calls
+// notFound() makes Next stream a 200 shell before the 404 is thrown, turning
+// every missing article into a soft 404.
 export default function Loading() {
   return (
     <div className="container-wide py-10" aria-hidden>
