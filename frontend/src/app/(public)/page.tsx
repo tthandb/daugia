@@ -37,13 +37,6 @@ export const metadata: Metadata = {
 // during background revalidation makes Next keep serving the last good page,
 // whereas returning [] would succeed and bake an empty homepage into the cache.
 // A genuine 200 with no articles still returns [] and renders normally.
-async function getFeaturedArticles() {
-  const res = await publicFetch<{ data: Article[] }>(
-    "/api/articles/featured?limit=3"
-  );
-  return res.data;
-}
-
 async function getLatestArticles() {
   const res = await publicFetch<PaginatedResponse<Article>>(
     "/api/articles?per_page=6"
@@ -57,8 +50,7 @@ async function getCategories() {
 }
 
 export default async function HomePage() {
-  const [featured, latest, categories] = await Promise.all([
-    getFeaturedArticles(),
+  const [latest, categories] = await Promise.all([
     getLatestArticles(),
     getCategories(),
   ]);
@@ -135,28 +127,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Featured Articles */}
-      {featured.length > 0 && (
-        <section className="py-14 sm:py-16">
-          <div className="container-wide">
-            <SectionHead
-              eyebrow="Nổi bật"
-              title="Thông báo đáng chú ý"
-              href="/articles"
-            />
-            <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {featured.map((article, idx) => (
-                <ArticleCard
-                  key={article.id}
-                  article={article}
-                  priority={idx === 0}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Category strip */}
       {categories.length > 0 && (
         <section className="border-y border-line bg-pine-pale/50 py-12">
@@ -192,8 +162,12 @@ export default async function HomePage() {
               href="/articles"
             />
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {latest.map((article) => (
-                <ArticleCard key={article.id} article={article} />
+              {latest.map((article, idx) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  priority={idx === 0}
+                />
               ))}
             </div>
           </div>
