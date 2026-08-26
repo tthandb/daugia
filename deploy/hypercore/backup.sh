@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Daily Postgres dump → uploaded to HyperCore Object Storage backup bucket.
-# Schedule via cron:  0 3 * * * /home/daugia/daugia/deploy/hypercore/backup.sh
+# Daily Postgres dump → uploaded to the Cloudflare R2 backup bucket.
+# Schedule via cron (VM runs UTC; 23:00 UTC = 06:00 ICT):
+#   0 23 * * * /home/daugia/daugia/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
 
 set -euo pipefail
 

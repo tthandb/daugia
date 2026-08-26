@@ -137,9 +137,9 @@ aws configure --profile r2  # paste OBJECT_STORAGE_ACCESS_KEY / SECRET_KEY
 # Test once
 ./backup.sh
 
-# Cron at 03:00 ICT daily
+# Cron at 23:00 UTC daily = 06:00 ICT (the VM runs UTC)
 crontab -e
-# 0 3 * * * /home/daugia/daugia/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
+# 0 23 * * * /home/daugia/daugia/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
 ```
 
 ## Day-to-day
