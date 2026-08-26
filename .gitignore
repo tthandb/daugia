@@ -38,3 +38,9 @@ Thumbs.db
 *.zip
 lxgnfmrwkbrzajkqwkpt/
 .vercel
+
+# Compiled Go binary (build with `go build -o bin/api ./cmd/api`)
+backend/api
+
+# Machine-local Claude Code settings — may contain credentials
+.claude/settings.local.json
