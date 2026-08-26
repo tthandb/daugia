@@ -7,39 +7,73 @@ Admins upload the official auction-notice DOCX/PDF documents the company issues 
 ## Architecture
 
 ```
-Vercel (edge)                        Hypercore
-  │ Next.js SSR/SSG                     │ Go API
-  │                                     │ (Docker Compose)
-daugia.vercel.app            api.daugiavinhyen.com
-  │                                     │
-  └──── API_URL ────────────────────────┘
-  (server-side fetch)
-                                        │
-                                   ┌────┴────┐
-                                   │         │
-                                  pgx    cf-go (R2)
-                                   │         │
-                              PostgreSQL  Cloudflare R2
+                    ┌────────────────────────────┐
+                    │ Vercel — Next.js 14        │  daugiavinhyen.com
+                    │ SSR / SSG, public pages    │  auto-deploy on push
+                    └─────────────┬──────────────┘
+                                  │  API_URL (server-side fetch)
+                                  ▼
+                    ┌────────────────────────────┐
+                    │ Caddy 2 — automatic TLS    │  api.daugiavinhyen.com
+                    ├────────────────────────────┤
+                    │ Go API (Chi)               │  HyperCore VPS
+                    ├────────────────────────────┤
+                    │ PostgreSQL 16              │  Ho Chi Minh 2
+                    ├────────────────────────────┤
+                    │ cron 06:00 ICT → backup.sh │  daugia user crontab
+                    └─────────────┬──────────────┘
+                                  │  minio-go (S3 API)
+                                  ▼
+                    ┌────────────────────────────┐
+                    │ Cloudflare R2              │  object storage
+                    ├────────────────────────────┤
+                    │ daugia-articles            │  documents, images
+                    │ daugia-articles-backups    │  nightly pg_dump
+                    └────────────────────────────┘
 ```
 
-**Frontend**: Next.js 14 on Vercel — SSR/SSG for SEO, client-rendered admin
-**Backend**: Go + Chi on Hypercore (HyperCore HYPER-2, HCM 2) — PostgreSQL, Cloudflare R2, JWT auth
-**Storage**: Cloudflare R2 (S3-compatible, presigned URLs for downloads)
+Three providers, one job each: **Vercel** serves the public site, **HyperCore**
+runs the API and its database, **Cloudflare** handles DNS and object storage.
+Nothing is on Kubernetes — the `k8s/` directory is dead reference only.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | Go 1.22+, Chi router, pgx, sqlc |
-| Database | PostgreSQL 16 (native FTS with `'simple'` dictionary) |
-| Storage | Cloudflare R2 (S3-compatible, presigned URLs) |
-| Auth | golang-jwt + bcrypt, httpOnly cookie |
-| Parsing | mammoth CLI (DOCX→HTML), pdftotext (PDF→text) |
-| Images | bimg/libvips (webp thumbnails) |
-| Infra | Hypercore Docker Compose (HCM 2) |
-| Frontend Hosting | Vercel (free tier, auto-deploy) |
-| Analytics | Vercel Analytics + backend view tracking |
+| Frontend | Next.js 14 (App Router), TypeScript strict, Tailwind CSS, shadcn/ui |
+| Fonts | Lora, Be Vietnam Pro, IBM Plex Mono — self-hosted via `next/font` |
+| Backend | Go 1.22+, Chi router |
+| DB access | pgx (driver) + sqlc (type-safe queries) + golang-migrate (schema) |
+| Database | PostgreSQL 16 — native FTS (tsvector + GIN, `'simple'` dictionary) |
+| Object storage | Cloudflare R2 (S3-compatible) via the `minio-go/v7` SDK |
+| Auth | golang-jwt + bcrypt — JWT in an httpOnly cookie, Chi middleware |
+| Parsing | mammoth CLI (DOCX→HTML), pdftotext/poppler (PDF→text), bluemonday sanitizer |
+| Images | bimg / libvips — 800×450 webp thumbnails, AVIF support |
+| Reverse proxy | Caddy 2 — automatic TLS via Let's Encrypt |
+| Runtime | Docker Compose (single VM, no orchestrator) |
+| CI/CD | GitHub Actions → GHCR image → SSH deploy |
+| Backups | `pg_dump` + AWS CLI → Cloudflare R2, scheduled with cron |
+| Monitoring | healthchecks.io dead-man's-switch, Vercel Analytics, `view_events` table |
+
+## Hosting
+
+Where each piece actually runs:
+
+| Component | Host | Address / location |
+|---|---|---|
+| Public site (Next.js) | **Vercel** (free tier) | `daugiavinhyen.com` — auto-deploys on push to `main` |
+| API (Go) | **HyperCore NVMe VPS HYPER-2** — 2 vCPU / 4 GB / 40 GB NVMe, Ho Chi Minh 2 | `api.daugiavinhyen.com` |
+| PostgreSQL 16 | Same VPS, Docker container | Bound to `127.0.0.1` only — never exposed publicly |
+| TLS / reverse proxy | Same VPS, Caddy 2 container | Certificates issued automatically by Let's Encrypt |
+| Documents, images, thumbnails | **Cloudflare R2** | Bucket `daugia-articles` |
+| Database backups | **Cloudflare R2** | Bucket `daugia-articles-backups`, prefix `postgres/` |
+| Container images | **GitHub Container Registry** | `ghcr.io/<owner>/daugia-api` |
+| DNS | **Cloudflare** | Nameservers `cleo` / `sue.ns.cloudflare.com` |
+| Backup heartbeat | **healthchecks.io** | Ping URL kept in `deploy/hypercore/.env`, never committed |
+
+Server-side paths on the VPS: the repo is checked out at
+`/home/daugia/daugia`, and Compose runs from `deploy/hypercore/` under the
+unprivileged `daugia` user.
 
 ## Quick Start
 
@@ -50,7 +84,7 @@ daugia.vercel.app            api.daugiavinhyen.com
 - [sqlc](https://sqlc.dev/)
 - [golang-migrate](https://github.com/golang-migrate/migrate)
 - PostgreSQL 16
-- MinIO
+- An S3-compatible bucket — Cloudflare R2 in production, or a local MinIO for development
 
 ### Backend
 
@@ -157,12 +191,12 @@ deploy/              Hypercore Docker Compose stack
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Secret key for JWT signing |
-| `MINIO_ENDPOINT` | S3-compatible storage endpoint (e.g., `<account-id>.r2.cloudflarestorage.com`) |
+| `MINIO_ENDPOINT` | S3-compatible storage endpoint — Cloudflare R2: `<account-id>.r2.cloudflarestorage.com` |
 | `MINIO_ACCESS_KEY` | R2 access key ID |
 | `MINIO_SECRET_KEY` | R2 secret access key |
-| `MINIO_BUCKET` | R2 bucket name (default: `articles`) |
+| `MINIO_BUCKET` | R2 bucket name — code default `articles`, production uses `daugia-articles` |
 | `MINIO_USE_SSL` | Use HTTPS for storage (default: `true`) |
-| `CORS_ORIGIN` | Allowed CORS origin (e.g., `https://daugia.vercel.app`) |
+| `CORS_ORIGIN` | Allowed CORS origin — production: `https://daugiavinhyen.com` |
 | `SECURE_COOKIE` | Require HTTPS for JWT cookie (default: `true`) |
 | `ADMIN_EMAIL` | Admin login email |
 | `ADMIN_PASSWORD` | Admin login password |
@@ -175,43 +209,87 @@ deploy/              Hypercore Docker Compose stack
 
 ## Deployment
 
+Both halves deploy automatically on push to `main`. Manual steps are for
+recovery, not routine releases.
+
 ### Frontend → Vercel
 
-1. Connect GitHub repo to Vercel
-2. Set root directory to `frontend`
-3. Add environment variables:
-   - `API_URL`: `https://api.daugiavinhyen.com`
-4. Auto-deploys on every git push to `main`
+Vercel watches the repo with root directory `frontend`. Every push to `main`
+triggers a production build; pull requests get preview URLs. The only required
+environment variable is `API_URL` = `https://api.daugiavinhyen.com`.
 
-### Backend → Hypercore
+### Backend → HyperCore VPS
+
+`.github/workflows/deploy.yml` runs whenever `backend/**`,
+`deploy/hypercore/**`, or the workflow file itself changes:
+
+1. Build the API image and push it to GHCR, tagged `sha-<short-sha>`.
+2. `scp` the Compose file to the VPS.
+3. Over SSH: pin `IMAGE_TAG` in `.env`, `docker compose pull api`, run
+   `migrate up` in a one-off container built from the **new** image, then
+   restart the API container.
+
+Migrations run before the container swap on purpose, so newly deployed code
+never queries a column that does not exist yet.
+
+Required repository secrets: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `SSH_PORT`
+(optional, defaults to 22), `DEPLOY_PATH`.
+
+Manual fallback, from `/home/daugia/daugia/deploy/hypercore` on the VPS:
 
 ```bash
-# Build Docker image locally
-docker build -t ghcr.io/yourusername/daugia-api:latest backend/
-
-# Push to GitHub Container Registry (or your registry)
-docker push ghcr.io/yourusername/daugia-api:latest
-
-# SSH into Hypercore VPS
-ssh user@api.daugiavinhyen.com
-
-# Pull latest image and restart via docker-compose
-cd /opt/daugia
-docker-compose pull
-docker-compose up -d
-
-# Verify health
-curl https://api.daugiavinhyen.com/api/health
+docker compose pull api && docker compose up -d --no-deps api
+docker compose exec -T api sh -c 'migrate -path /app/migrations -database "$DATABASE_URL" up'
+curl -fsS https://api.daugiavinhyen.com/api/health
 ```
 
-**First-time setup on VPS**:
+First-time setup only:
 
 ```bash
-# Initialize database and seed admin user
-docker-compose exec api /app/api seed
+docker compose exec -T api /app/api seed            # admin user + categories
+docker compose exec -T api /app/api migrate-legacy  # import 38 legacy articles
+```
 
-# Import legacy articles from Supabase (if needed)
-docker-compose exec api /app/api migrate-legacy
+## Scheduled Jobs (Cron)
+
+There is exactly one scheduled job. It lives in the **`daugia` user's crontab
+on the HyperCore VPS** — not in `/etc/cron.d`, not in root's crontab, and not
+in GitHub Actions:
+
+```bash
+ssh daugia@api.daugiavinhyen.com crontab -l
+# 0 23 * * * /home/daugia/daugia/deploy/hypercore/backup.sh >> /home/daugia/backup.log 2>&1
+```
+
+| Property | Value |
+|---|---|
+| Script | `deploy/hypercore/backup.sh` (in this repo, checked out on the VPS) |
+| Schedule | `0 23 * * *` — the VM runs UTC, so this is **06:00 ICT** daily |
+| Log | `/home/daugia/backup.log` |
+| Destination | `s3://daugia-articles-backups/postgres/db-<UTC-timestamp>.sql.gz` |
+| Retention | 30 days — older dumps are pruned by the same script |
+| Monitoring | healthchecks.io ping (`HEARTBEAT_URL` in `deploy/hypercore/.env`) |
+
+Each run dumps `pg_dumpall --globals-only` (so roles can be recreated on a bare
+restore) followed by `pg_dump` of the database, gzips both into one file, and
+uploads it with the AWS CLI using the `r2` profile. It also deletes
+`view_events` rows older than 90 days so that append-only table cannot fill the
+40 GB disk; that prune is best-effort and never fails the backup.
+
+If `HEARTBEAT_URL` is set, the script pings `/start` before dumping and the base
+URL on success, so healthchecks.io raises an alert when a run stops happening —
+the failure mode that would otherwise stay invisible. Configure the check with
+**Period 1 day, Grace 3 hours**.
+
+Only the database is backed up. Uploaded documents, images, and thumbnails
+already live in R2 rather than on the VPS, so they need no separate dump.
+
+Restore a dump:
+
+```bash
+aws --profile r2 --endpoint-url "https://$OBJECT_STORAGE_ENDPOINT" \
+    s3 cp s3://daugia-articles-backups/postgres/db-<timestamp>.sql.gz .
+gunzip -c db-<timestamp>.sql.gz | docker compose exec -T postgres psql -U "$POSTGRES_USER"
 ```
 
 ## Legacy Migration
