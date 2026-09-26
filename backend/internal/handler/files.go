@@ -1,9 +1,12 @@
 package handler
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
+	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,93 +20,66 @@ import (
 	"github.com/daugia999/backend/internal/imageopt"
 )
 
-// ProxyThumbnail serves thumbnail images from object storage. The content
-// type is sniffed from the file's magic bytes — historically the upload
-// path stored JPEG bytes labeled as image/webp, so we cannot trust the
-// extension or stored mime. This makes Vercel's Image optimizer (and any
-// CDN) re-encode them correctly.
+// ProxyThumbnail serves the cover image. The content type is sniffed from the
+// magic bytes because legacy thumbnails were JPEG bytes stored as .webp.
 func (h *Handler) ProxyThumbnail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	article, err := h.queries.GetArticleByID(ctx, id)
-	if err != nil || article.ThumbnailKey == nil {
-		writeError(w, 404, "thumbnail not found")
-		return
-	}
-
-	obj, err := h.store.GetObject(ctx, *article.ThumbnailKey)
+	art, err := h.queries.GetArticleThumbnail(ctx, id)
 	if err != nil {
-		writeError(w, 404, "thumbnail not found")
+		writeDBError(w, err, "thumbnail not found")
 		return
 	}
-	defer obj.Close()
-
-	info, err := obj.Stat()
-	if err != nil {
-		writeError(w, 404, "thumbnail not found")
+	if art.ThumbnailKey == nil || !h.canView(r, art.Status) {
+		writeError(w, http.StatusNotFound, "thumbnail not found")
 		return
 	}
-
-	// Sniff the first 12 bytes for the real MIME, then concatenate them with
-	// the rest of the body. Cheap; avoids buffering the whole image.
-	head := make([]byte, 12)
-	n, _ := io.ReadFull(obj, head)
-	mime := imageopt.SniffMime(head[:n])
-	if mime == "application/octet-stream" {
-		mime = "image/webp" // last-resort fallback for files that begin past the magic-byte window
-	}
-
-	w.Header().Set("Content-Type", mime)
-	// Public, long-lived: thumbnails are immutable per article ID. Vercel
-	// edge will cache; admins refresh by re-uploading (which mints a new key).
-	w.Header().Set("Cache-Control", "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400")
-	w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))
-	if r.Method == http.MethodHead {
-		return
-	}
-	if _, err := w.Write(head[:n]); err != nil {
-		return
-	}
-	_, _ = io.Copy(w, obj)
+	h.streamImage(w, r, *art.ThumbnailKey, "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400")
 }
 
-// ProxyImage serves gallery images from object storage. Same MIME sniffing
-// as ProxyThumbnail; gallery files are also keyed by CUID so the immutable
-// cache directive is safe.
+// ProxyImage serves gallery images; keys are CUIDs so the immutable directive is safe.
 func (h *Handler) ProxyImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	img, err := h.queries.GetArticleImage(ctx, id)
 	if err != nil {
-		writeError(w, 404, "image not found")
+		writeDBError(w, err, "image not found")
 		return
 	}
+	if !h.canView(r, img.ArticleStatus) {
+		writeError(w, http.StatusNotFound, "image not found")
+		return
+	}
+	h.streamImage(w, r, img.FileKey, "public, max-age=31536000, immutable")
+}
 
-	obj, err := h.store.GetObject(ctx, img.FileKey)
+// canView gates files of unpublished articles: only an authenticated admin may
+// fetch them, so a withdrawn notice's documents stop leaking via old links.
+func (h *Handler) canView(r *http.Request, status string) bool {
+	return status == "PUBLISHED" || h.isAdmin(r)
+}
+
+func (h *Handler) streamImage(w http.ResponseWriter, r *http.Request, key, cacheControl string) {
+	obj, err := h.store.GetObject(r.Context(), key)
 	if err != nil {
-		writeError(w, 404, "image file not found")
+		log.Printf("get object %s: %v", key, err)
+		writeError(w, http.StatusNotFound, "file not found")
 		return
 	}
 	defer obj.Close()
 
-	info, err := obj.Stat()
-	if err != nil {
-		writeError(w, 404, "image file not found")
-		return
-	}
-
 	head := make([]byte, 12)
 	n, _ := io.ReadFull(obj, head)
-	mime := imageopt.SniffMime(head[:n])
-	if mime == "application/octet-stream" {
-		mime = "image/webp"
+	contentType := imageopt.SniffMime(head[:n])
+	if contentType == "application/octet-stream" {
+		contentType = "image/webp"
 	}
 
-	w.Header().Set("Content-Type", mime)
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("Content-Length", strconv.FormatInt(obj.Size, 10))
 	if r.Method == http.MethodHead {
 		return
 	}
@@ -113,333 +89,419 @@ func (h *Handler) ProxyImage(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, obj)
 }
 
-
-// DownloadAttachment redirects to a presigned URL for the attachment
 func (h *Handler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attachmentID := chi.URLParam(r, "attachmentId")
 
-	att, err := h.queries.GetArticleAttachment(ctx, attachmentID)
+	att, err := h.queries.GetArticleAttachment(ctx, db.GetArticleAttachmentParams{
+		ID: chi.URLParam(r, "attachmentId"), ArticleID: chi.URLParam(r, "id"),
+	})
 	if err != nil {
-		writeError(w, 404, "attachment not found")
+		writeDBError(w, err, "attachment not found")
+		return
+	}
+	if !h.canView(r, att.ArticleStatus) {
+		writeError(w, http.StatusNotFound, "attachment not found")
 		return
 	}
 
-	url, err := h.store.PresignedURL(ctx, att.FileKey, 30*time.Minute)
+	url, err := h.store.PresignedDownloadURL(ctx, att.FileKey, att.FileName, 30*time.Minute)
 	if err != nil {
-		writeError(w, 500, "failed to generate download URL")
+		log.Printf("presign %s: %v", att.FileKey, err)
+		writeError(w, http.StatusBadGateway, "failed to generate download URL")
 		return
 	}
-
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	redirectNoStore(w, r, url)
 }
 
-// AdminUploadImages handles multi-image upload for article gallery
+// AdminUploadImages accepts one or more gallery images under either the
+// "images" or "file" field (the admin UI sends "file").
 func (h *Handler) AdminUploadImages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	articleID := chi.URLParam(r, "id")
 
-	if err := r.ParseMultipartForm(50 << 20); err != nil {
-		writeError(w, 400, "invalid form data")
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form data")
 		return
 	}
-
-	files := r.MultipartForm.File["images"]
+	files := append(r.MultipartForm.File["images"], r.MultipartForm.File["file"]...)
 	if len(files) == 0 {
-		writeError(w, 400, "no images provided")
+		writeError(w, http.StatusBadRequest, "no images provided")
+		return
+	}
+	if _, err := h.queries.GetArticleByID(ctx, articleID); err != nil {
+		writeDBError(w, err, "article not found")
 		return
 	}
 
-	// Get current max sort order
-	existingImages, _ := h.queries.ListArticleImages(ctx, articleID)
-	sortOrder := int32(len(existingImages))
+	existing, err := h.queries.ListArticleImages(ctx, articleID)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+	sortOrder := int32(len(existing))
 
-	var results []map[string]any
+	results := make([]map[string]any, 0, len(files))
 	var firstKey string
+	stored := 0
 
 	for _, fh := range files {
-		// Validate MIME
-		mime := fh.Header.Get("Content-Type")
-		if !isAllowedImageMime(mime) {
-			continue
-		}
-
-		file, err := fh.Open()
+		key, imageID, err := h.storeGalleryImage(ctx, articleID, fh)
 		if err != nil {
+			results = append(results, map[string]any{"fileName": fh.Filename, "error": err.Error()})
 			continue
 		}
-
-		// Save to temp for processing
-		tmpDir, _ := os.MkdirTemp("", "img-*")
-		tmpFile := filepath.Join(tmpDir, fh.Filename)
-		f, _ := os.Create(tmpFile)
-		io.Copy(f, file)
-		f.Close()
-		file.Close()
-
-		imageID := cuid.New()
-		key := fmt.Sprintf("images/%s/%s.webp", articleID, imageID)
-
-		// Optimize to WebP at q=75, max 1600px long edge via vipsthumbnail.
-		// Falls back to uploading the original bytes if vips-tools is not
-		// installed (dev environments) — never fail the upload over format.
-		var (
-			uploadPath  string
-			uploadMime  string
-			imgWidth    int32
-			imgHeight   int32
-		)
-		optPath := filepath.Join(tmpDir, imageID+".webp")
-		if w, h, err := imageopt.OptimizeWebP(tmpFile, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
-			uploadPath = optPath
-			uploadMime = "image/webp"
-			imgWidth = int32(w)
-			imgHeight = int32(h)
-		} else {
-			uploadPath = tmpFile
-			uploadMime = mime
-		}
-
-		size, err := h.uploadLocalFile(ctx, key, uploadPath, uploadMime)
-		if err != nil {
-			// Skip this image rather than inserting a row pointing at a missing
-			// object; report it so the admin knows the upload didn't take.
-			results = append(results, map[string]any{
-				"fileName": fh.Filename,
-				"error":    "tải lên thất bại",
-			})
-			os.RemoveAll(tmpDir)
-			continue
-		}
-
-		sortOrder++
 		img, err := h.queries.CreateArticleImage(ctx, db.CreateArticleImageParams{
 			ID:        imageID,
 			ArticleID: articleID,
-			FileKey:   key,
+			FileKey:   key.key,
 			FileName:  fh.Filename,
 			AltText:   "",
-			Width:     imgWidth,
-			Height:    imgHeight,
-			SizeBytes: int32(size),
+			Width:     key.width,
+			Height:    key.height,
+			SizeBytes: int32(key.size),
 			SortOrder: sortOrder,
 		})
-		if err == nil {
-			if firstKey == "" {
-				firstKey = key
+		if err != nil {
+			if delErr := h.store.Delete(ctx, key.key); delErr != nil {
+				log.Printf("clean up orphaned image %s: %v", key.key, delErr)
 			}
-			results = append(results, map[string]any{
-				"id":       img.ID,
-				"url":      fmt.Sprintf("/api/images/%s", img.ID),
-				"fileName": img.FileName,
-			})
-		} else {
-			// DB insert failed after a successful upload — remove the orphan.
-			if delErr := h.store.Delete(ctx, key); delErr != nil {
-				fmt.Printf("failed to clean up orphaned image %s: %v\n", key, delErr)
-			}
+			log.Printf("create image row: %v", err)
+			results = append(results, map[string]any{"fileName": fh.Filename, "error": "lưu thông tin ảnh thất bại"})
+			continue
 		}
-
-		os.RemoveAll(tmpDir)
+		sortOrder++
+		stored++
+		if firstKey == "" {
+			firstKey = key.key
+		}
+		results = append(results, map[string]any{
+			"id":       img.ID,
+			"url":      fmt.Sprintf("/api/images/%s", img.ID),
+			"fileName": img.FileName,
+		})
 	}
 
-	// A scanned PDF yields no cover, so the article keeps a NULL thumbnail_key:
-	// the card falls back to a placeholder and JSON-LD drops Article/Event
-	// `image`, which Google wants. Adopt the first gallery image as the cover
-	// when none is set; an existing cover is never overwritten.
-	if firstKey != "" {
-		if a, err := h.queries.GetArticleByID(ctx, articleID); err == nil && a.ThumbnailKey == nil {
-			if _, err := h.queries.UpdateArticle(ctx, db.UpdateArticleParams{
-				ID:           articleID,
-				ThumbnailKey: &firstKey,
-			}); err != nil {
-				fmt.Printf("failed to adopt cover image for article %s: %v\n", articleID, err)
-			}
+	if stored == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "no valid images provided", "data": results})
+		return
+	}
+
+	// A scanned PDF yields no cover; adopt the first gallery image so cards and
+	// JSON-LD get an image. An existing cover is never overwritten.
+	if cur, err := h.queries.GetArticleThumbnail(ctx, articleID); err == nil && cur.ThumbnailKey == nil {
+		if _, err := h.queries.SetArticleThumbnail(ctx, db.SetArticleThumbnailParams{ID: articleID, ThumbnailKey: &firstKey}); err != nil {
+			log.Printf("adopt cover for %s: %v", articleID, err)
 		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{"data": results})
 }
 
+type storedImage struct {
+	key           string
+	width, height int32
+	size          int64
+}
+
+func (h *Handler) storeGalleryImage(ctx context.Context, articleID string, fh *multipart.FileHeader) (storedImage, string, error) {
+	contentType := fh.Header.Get("Content-Type")
+	if !isAllowedImageMime(contentType) {
+		return storedImage{}, "", fmt.Errorf("định dạng %s không được hỗ trợ", contentType)
+	}
+	file, err := fh.Open()
+	if err != nil {
+		return storedImage{}, "", fmt.Errorf("không đọc được file")
+	}
+	defer file.Close()
+	head, err := peekHead(file)
+	if err != nil || !magicMatches(contentType, head) {
+		return storedImage{}, "", fmt.Errorf("nội dung file không phải ảnh %s", contentType)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "img-*")
+	if err != nil {
+		return storedImage{}, "", fmt.Errorf("không tạo được thư mục tạm")
+	}
+	defer os.RemoveAll(tmpDir)
+
+	imageID := cuid.New()
+	srcPath, err := spoolUpload(tmpDir, imageID+extForMime(contentType), file)
+	if err != nil {
+		return storedImage{}, "", fmt.Errorf("không ghi được file tạm")
+	}
+
+	// Optimize to WebP (q=75, max 1600px). Falls back to the original bytes
+	// when vips-tools is missing (dev machines); never fail an upload on format.
+	uploadPath, uploadMime := srcPath, contentType
+	var width, height int32
+	optPath := filepath.Join(tmpDir, imageID+".webp")
+	if iw, ih, err := imageopt.OptimizeWebP(ctx, srcPath, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
+		uploadPath, uploadMime = optPath, "image/webp"
+		width, height = int32(iw), int32(ih)
+	}
+
+	key := fmt.Sprintf("images/%s/%s.webp", articleID, imageID)
+	size, err := h.uploadLocalFile(ctx, key, uploadPath, uploadMime)
+	if err != nil {
+		log.Printf("upload image %s: %v", key, err)
+		return storedImage{}, "", fmt.Errorf("tải lên thất bại")
+	}
+	return storedImage{key: key, width: width, height: height, size: size}, imageID, nil
+}
+
 func (h *Handler) AdminUpdateImage(w http.ResponseWriter, r *http.Request) {
-	imageID := chi.URLParam(r, "imageId")
 	var req struct {
 		AltText *string `json:"altText"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, 400, "invalid request body")
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.AltText != nil {
-		_ = h.queries.UpdateArticleImageAlt(r.Context(), db.UpdateArticleImageAltParams{
-			ID:      imageID,
-			AltText: *req.AltText,
-		})
+	if req.AltText == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "updated"})
+		return
+	}
+	rows, err := h.queries.UpdateArticleImageAlt(r.Context(), db.UpdateArticleImageAltParams{
+		ID: chi.URLParam(r, "imageId"), ArticleID: chi.URLParam(r, "id"), AltText: *req.AltText,
+	})
+	if err != nil {
+		writeDBError(w, err, "image not found")
+		return
+	}
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "image not found")
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "updated"})
 }
 
 func (h *Handler) AdminDeleteImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	imageID := chi.URLParam(r, "imageId")
+	articleID := chi.URLParam(r, "id")
 
-	fileKey, err := h.queries.DeleteArticleImage(ctx, imageID)
+	fileKey, err := h.queries.DeleteArticleImage(ctx, db.DeleteArticleImageParams{
+		ID: chi.URLParam(r, "imageId"), ArticleID: articleID,
+	})
 	if err != nil {
-		writeError(w, 404, "image not found")
+		writeDBError(w, err, "image not found")
 		return
 	}
-	_ = h.store.Delete(ctx, fileKey)
+	if err := h.store.Delete(ctx, fileKey); err != nil {
+		log.Printf("delete object %s: %v", fileKey, err)
+	}
+
+	// If the deleted image was the cover, move the cover to the next image (or
+	// clear it) instead of leaving thumbnail_key pointing at a missing object.
+	if cur, err := h.queries.GetArticleThumbnail(ctx, articleID); err == nil && cur.ThumbnailKey != nil && *cur.ThumbnailKey == fileKey {
+		var next *string
+		if remaining, err := h.queries.ListArticleImages(ctx, articleID); err == nil && len(remaining) > 0 {
+			next = &remaining[0].FileKey
+		}
+		if _, err := h.queries.SetArticleThumbnail(ctx, db.SetArticleThumbnailParams{ID: articleID, ThumbnailKey: next}); err != nil {
+			log.Printf("reset cover for %s: %v", articleID, err)
+		}
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// AdminReorderImages applies a full ordering atomically; ids that do not belong
+// to the article are rejected before anything is written.
 func (h *Handler) AdminReorderImages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	articleID := chi.URLParam(r, "id")
+
 	var req struct {
 		IDs []string `json:"ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, 400, "invalid request body")
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	for i, id := range req.IDs {
-		_ = h.queries.UpdateArticleImageOrder(r.Context(), db.UpdateArticleImageOrderParams{
-			ID:        id,
-			SortOrder: int32(i),
-		})
+	existing, err := h.queries.ListArticleImages(ctx, articleID)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+	owned := make(map[string]bool, len(existing))
+	for _, img := range existing {
+		owned[img.ID] = true
+	}
+	for _, id := range req.IDs {
+		if !owned[id] {
+			writeError(w, http.StatusBadRequest, "image does not belong to this article")
+			return
+		}
+	}
+
+	err = h.inTx(ctx, func(q *db.Queries) error {
+		for i, id := range req.IDs {
+			if _, err := q.UpdateArticleImageOrder(ctx, db.UpdateArticleImageOrderParams{
+				ID: id, ArticleID: articleID, SortOrder: int32(i),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		writeDBError(w, err, "")
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "reordered"})
 }
 
-// AdminUploadAttachment handles file attachment upload
 func (h *Handler) AdminUploadAttachment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	articleID := chi.URLParam(r, "id")
 
-	if err := r.ParseMultipartForm(20 << 20); err != nil {
-		writeError(w, 400, "invalid form data")
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form data")
 		return
 	}
-
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "file is required")
+		writeError(w, http.StatusBadRequest, "file is required")
 		return
 	}
 	defer file.Close()
 
-	mime := header.Header.Get("Content-Type")
-	if !isAllowedAttachmentMime(mime) {
-		writeError(w, 400, "unsupported file type")
+	contentType := header.Header.Get("Content-Type")
+	if !isAllowedAttachmentMime(contentType) {
+		writeError(w, http.StatusBadRequest, "unsupported file type")
+		return
+	}
+	head, err := peekHead(file)
+	if err != nil || !magicMatches(contentType, head) {
+		writeError(w, http.StatusBadRequest, "file content does not match its declared type")
+		return
+	}
+	if _, err := h.queries.GetArticleByID(ctx, articleID); err != nil {
+		writeDBError(w, err, "article not found")
 		return
 	}
 
 	attachmentID := cuid.New()
-	ext := filepath.Ext(header.Filename)
+	ext := filepath.Ext(filepath.Base(header.Filename))
 	key := fmt.Sprintf("attachments/%s/%s%s", articleID, attachmentID, ext)
 
-	// Save to temp, upload
-	tmpDir, _ := os.MkdirTemp("", "att-*")
+	tmpDir, err := os.MkdirTemp("", "att-*")
+	if err != nil {
+		log.Printf("mkdir temp: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
 	defer os.RemoveAll(tmpDir)
-	tmpFile := filepath.Join(tmpDir, header.Filename)
-	f, err := os.Create(tmpFile)
+	tmpFile, err := spoolUpload(tmpDir, attachmentID+ext, file)
 	if err != nil {
-		writeError(w, 500, "failed to buffer upload")
+		log.Printf("spool upload: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	if _, err := io.Copy(f, file); err != nil {
-		f.Close()
-		writeError(w, 500, "failed to buffer upload")
-		return
-	}
-	f.Close()
 
-	size, err := h.uploadLocalFile(ctx, key, tmpFile, mime)
+	size, err := h.uploadLocalFile(ctx, key, tmpFile, contentType)
 	if err != nil {
+		log.Printf("upload %s: %v", key, err)
 		writeError(w, http.StatusBadGateway, "failed to store attachment")
 		return
 	}
 
-	existingAtts, _ := h.queries.ListArticleAttachments(ctx, articleID)
-	sortOrder := int32(len(existingAtts))
+	existing, err := h.queries.ListArticleAttachments(ctx, articleID)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
 
 	att, err := h.queries.CreateArticleAttachment(ctx, db.CreateArticleAttachmentParams{
 		ID:        attachmentID,
 		ArticleID: articleID,
 		FileKey:   key,
-		FileName:  header.Filename,
-		FileMime:  mime,
+		FileName:  filepath.Base(header.Filename),
+		FileMime:  contentType,
 		SizeBytes: int32(size),
-		SortOrder: sortOrder,
+		SortOrder: int32(len(existing)),
 	})
 	if err != nil {
 		if delErr := h.store.Delete(ctx, key); delErr != nil {
-			fmt.Printf("failed to clean up orphaned attachment %s: %v\n", key, delErr)
+			log.Printf("clean up orphaned attachment %s: %v", key, delErr)
 		}
-		writeError(w, 500, "failed to create attachment")
+		writeDBError(w, err, "")
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"id":       att.ID,
-			"fileName": att.FileName,
-			"fileMime": att.FileMime,
-		},
+		"data": map[string]any{"id": att.ID, "fileName": att.FileName, "fileMime": att.FileMime},
 	})
 }
 
 func (h *Handler) AdminUpdateAttachment(w http.ResponseWriter, r *http.Request) {
-	attachmentID := chi.URLParam(r, "attachmentId")
 	var req struct {
 		FileName *string `json:"fileName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, 400, "invalid request body")
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.FileName != nil {
-		_ = h.queries.UpdateArticleAttachmentName(r.Context(), db.UpdateArticleAttachmentNameParams{
-			ID:       attachmentID,
-			FileName: *req.FileName,
-		})
+	if req.FileName == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "updated"})
+		return
+	}
+	rows, err := h.queries.UpdateArticleAttachmentName(r.Context(), db.UpdateArticleAttachmentNameParams{
+		ID: chi.URLParam(r, "attachmentId"), ArticleID: chi.URLParam(r, "id"), FileName: *req.FileName,
+	})
+	if err != nil {
+		writeDBError(w, err, "attachment not found")
+		return
+	}
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "attachment not found")
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "updated"})
 }
 
 func (h *Handler) AdminDeleteAttachment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	attachmentID := chi.URLParam(r, "attachmentId")
-
-	fileKey, err := h.queries.DeleteArticleAttachment(ctx, attachmentID)
+	fileKey, err := h.queries.DeleteArticleAttachment(ctx, db.DeleteArticleAttachmentParams{
+		ID: chi.URLParam(r, "attachmentId"), ArticleID: chi.URLParam(r, "id"),
+	})
 	if err != nil {
-		writeError(w, 404, "attachment not found")
+		writeDBError(w, err, "attachment not found")
 		return
 	}
-	_ = h.store.Delete(ctx, fileKey)
+	if err := h.store.Delete(ctx, fileKey); err != nil {
+		log.Printf("delete object %s: %v", fileKey, err)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- Helpers ---
 
-func isAllowedImageMime(mime string) bool {
-	allowed := map[string]bool{
-		"image/jpeg": true,
-		"image/png":  true,
-		"image/webp": true,
+func isAllowedImageMime(m string) bool {
+	switch m {
+	case "image/jpeg", "image/png", "image/webp":
+		return true
 	}
-	return allowed[mime]
+	return false
 }
 
-func isAllowedAttachmentMime(mime string) bool {
-	allowed := map[string]bool{
-		"application/pdf":  true,
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
-		"application/vnd.ms-excel":  true,
-		"text/csv":                  true,
-		"application/msword":        true,
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
-		"image/jpeg": true,
-		"image/png":  true,
+func isAllowedAttachmentMime(m string) bool {
+	switch m {
+	case "application/pdf",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/vnd.ms-excel",
+		"text/csv",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"image/jpeg", "image/png":
+		return true
 	}
-	return allowed[mime]
+	return false
+}
+
+func extForMime(m string) string {
+	if exts, _ := mime.ExtensionsByType(m); len(exts) > 0 {
+		return exts[0]
+	}
+	return ".bin"
 }

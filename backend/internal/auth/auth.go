@@ -22,6 +22,16 @@ const (
 	cookieName  = "token"
 )
 
+// DummyHash is compared against when the user does not exist, so failed
+// logins cost the same bcrypt time either way.
+var DummyHash = func() string {
+	h, err := bcrypt.GenerateFromPassword([]byte("no-such-user"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(err)
+	}
+	return string(h)
+}()
+
 // HashPassword returns a bcrypt hash of the given password.
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -95,14 +105,14 @@ func SetTokenCookie(w http.ResponseWriter, token string, secure bool) {
 
 // ClearTokenCookie removes the token cookie by setting it to an empty
 // value with an immediate expiry.
-func ClearTokenCookie(w http.ResponseWriter) {
+func ClearTokenCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 	})
 }

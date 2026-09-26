@@ -6,8 +6,6 @@ package db
 
 import (
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Article struct {
@@ -24,13 +22,13 @@ type Article struct {
 	District         *string     `json:"district"`
 	Ward             *string     `json:"ward"`
 	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
+	PlotCount        *int32      `json:"plot_count"`
 	TotalArea        *string     `json:"total_area"`
 	ThumbnailKey     *string     `json:"thumbnail_key"`
 	OriginalFileKey  *string     `json:"original_file_key"`
 	OriginalFileName *string     `json:"original_file_name"`
 	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
+	LegacyID         *int32      `json:"legacy_id"`
 	LegacyFileKey    *string     `json:"legacy_file_key"`
 	ViewCount        int32       `json:"view_count"`
 	CategoryID       *string     `json:"category_id"`
@@ -42,8 +40,8 @@ type Article struct {
 	AuctionEnd       *time.Time  `json:"auction_end"`
 	VenueName        *string     `json:"venue_name"`
 	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
+	StartingPrice    *int64      `json:"starting_price"`
+	DepositAmount    *int64      `json:"deposit_amount"`
 }
 
 type ArticleAttachment struct {

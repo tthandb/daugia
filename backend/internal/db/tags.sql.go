@@ -24,6 +24,17 @@ func (q *Queries) AddArticleTag(ctx context.Context, arg AddArticleTagParams) er
 	return err
 }
 
+const countTagsByIDs = `-- name: CountTagsByIDs :one
+SELECT count(*) FROM tags WHERE id = ANY($1::text[])
+`
+
+func (q *Queries) CountTagsByIDs(ctx context.Context, dollar_1 []string) (int64, error) {
+	row := q.db.QueryRow(ctx, countTagsByIDs, dollar_1)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTag = `-- name: CreateTag :one
 INSERT INTO tags (id, name, slug)
 VALUES ($1, $2, $3)
@@ -48,13 +59,16 @@ func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, erro
 	return i, err
 }
 
-const deleteTag = `-- name: DeleteTag :exec
+const deleteTag = `-- name: DeleteTag :execrows
 DELETE FROM tags WHERE id = $1
 `
 
-func (q *Queries) DeleteTag(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteTag, id)
-	return err
+func (q *Queries) DeleteTag(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTag, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getTagByID = `-- name: GetTagByID :one

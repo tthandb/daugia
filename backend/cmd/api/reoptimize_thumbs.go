@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/daugia999/backend/internal/imageopt"
-	"github.com/daugia999/backend/internal/storage"
 )
 
 // runReoptimizeThumbs walks every published article whose ThumbnailKey is set,
@@ -24,35 +21,23 @@ import (
 // JPEG bytes mislabeled as image/webp. Run after deploying:
 //
 //	docker compose exec api /app/api reoptimize-thumbs
-func runReoptimizeThumbs() {
+func runReoptimizeThumbs() error {
 	if !imageopt.HasVipsThumbnail() {
-		log.Fatal("vipsthumbnail not on PATH — install vips-tools (apk add vips-tools / apt install libvips-tools)")
+		return errors.New("vipsthumbnail not on PATH — install vips-tools (apk add vips-tools / apt install libvips-tools)")
 	}
-
-	databaseURL := mustEnv("DATABASE_URL")
-	minioEndpoint := mustEnv("MINIO_ENDPOINT")
-	minioAccessKey := mustEnv("MINIO_ACCESS_KEY")
-	minioSecretKey := mustEnv("MINIO_SECRET_KEY")
-	minioBucket := envOr("MINIO_BUCKET", "articles")
-	minioSSL := envOr("MINIO_USE_SSL", "false") == "true"
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, store, err := openDeps(ctx)
 	if err != nil {
-		log.Fatalf("db: %v", err)
+		return err
 	}
 	defer pool.Close()
-
-	store, err := storage.New(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioSSL)
-	if err != nil {
-		log.Fatalf("storage: %v", err)
-	}
 
 	// We need every article (regardless of status) that has a thumbnail key.
 	// ListAllArticlesSlugs returns published only; query directly instead.
 	rows, err := pool.Query(ctx, `SELECT id, slug, thumbnail_key FROM articles WHERE thumbnail_key IS NOT NULL`)
 	if err != nil {
-		log.Fatalf("query articles: %v", err)
+		return fmt.Errorf("query articles: %w", err)
 	}
 	defer rows.Close()
 
@@ -62,12 +47,19 @@ func runReoptimizeThumbs() {
 	var todo []article
 	for rows.Next() {
 		var a article
-		if err := rows.Scan(&a.id, &a.slug, &a.key); err == nil {
-			todo = append(todo, a)
+		if err := rows.Scan(&a.id, &a.slug, &a.key); err != nil {
+			return fmt.Errorf("scan: %w", err)
 		}
+		todo = append(todo, a)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate: %w", err)
 	}
 
-	tmpDir, _ := os.MkdirTemp("", "reopt-*")
+	tmpDir, err := os.MkdirTemp("", "reopt-*")
+	if err != nil {
+		return err
+	}
 	defer os.RemoveAll(tmpDir)
 
 	var totalBefore, totalAfter int64
@@ -80,22 +72,23 @@ func runReoptimizeThumbs() {
 			fmt.Printf("    SKIP (get): %v\n", err)
 			continue
 		}
-		stat, err := obj.Stat()
+		srcPath := filepath.Join(tmpDir, a.slug+"-src")
+		f, err := os.Create(srcPath)
 		if err != nil {
 			obj.Close()
-			fmt.Printf("    SKIP (stat): %v\n", err)
-			continue
+			return err
 		}
-		srcPath := filepath.Join(tmpDir, a.slug+"-src")
-		f, _ := os.Create(srcPath)
-		n, _ := io.Copy(f, obj)
+		before, err := io.Copy(f, obj)
 		f.Close()
 		obj.Close()
-		before := n
+		if err != nil {
+			fmt.Printf("    SKIP (download): %v\n", err)
+			continue
+		}
 
 		// Re-encode
 		dstPath := filepath.Join(tmpDir, a.slug+".webp")
-		w, h, err := imageopt.OptimizeWebP(srcPath, dstPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality)
+		w, h, err := imageopt.OptimizeWebP(ctx, srcPath, dstPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality)
 		if err != nil {
 			fmt.Printf("    SKIP (encode): %v\n", err)
 			continue
@@ -118,7 +111,6 @@ func runReoptimizeThumbs() {
 
 		totalBefore += before
 		totalAfter += after
-		_ = stat
 		fmt.Printf("    %d → %d bytes (%.0f%%) @ %dx%d\n",
 			before, after, float64(after)/float64(before)*100, w, h)
 	}
@@ -129,4 +121,5 @@ func runReoptimizeThumbs() {
 			totalBefore, totalAfter, totalBefore-totalAfter,
 			(1.0-float64(totalAfter)/float64(totalBefore))*100)
 	}
+	return nil
 }

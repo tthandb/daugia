@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
@@ -21,10 +21,10 @@ import (
 
 // migrateLocal imports articles from the local legacy storage directory.
 // Expects LEGACY_DATA_DIR to point to the daugia/ directory containing document/ and image/.
-func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Client) {
+func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Client) error {
 	dataDir := os.Getenv("LEGACY_DATA_DIR")
 	if dataDir == "" {
-		dataDir = "/data/daugia"
+		return errors.New("LEGACY_DATA_DIR must point to the legacy daugia/ directory")
 	}
 
 	docDir := filepath.Join(dataDir, "document")
@@ -33,13 +33,12 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 	// List all document files
 	entries, err := os.ReadDir(docDir)
 	if err != nil {
-		log.Fatalf("failed to read document directory %s: %v", docDir, err)
+		return fmt.Errorf("read document directory %s: %w", docDir, err)
 	}
 
-	// Load categories for mapping
 	cats, err := queries.ListCategories(ctx)
 	if err != nil {
-		log.Fatalf("failed to load categories: %v", err)
+		return fmt.Errorf("load categories: %w", err)
 	}
 	catMap := make(map[string]string) // slug -> id
 	for _, c := range cats {
@@ -61,6 +60,7 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 	fmt.Printf("found %d document files, %d image files\n", len(entries), len(imageMap))
 
 	counter := 0
+	failed := 0
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -90,11 +90,12 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 		var contentHTML, contentPlain string
 		switch ext {
 		case ".docx":
-			contentHTML, contentPlain, err = parser.ParseDOCX(filePath)
+			contentHTML, contentPlain, err = parser.ParseDOCX(ctx, filePath)
 		case ".pdf":
-			contentHTML, contentPlain, err = parser.ParsePDF(filePath)
+			contentHTML, contentPlain, err = parser.ParsePDF(ctx, filePath)
 		}
 		if err != nil {
+			failed++
 			log.Printf("  failed to parse %s: %v", fileName, err)
 			continue
 		}
@@ -111,15 +112,13 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 		// Detect category
 		categoryID := detectCategory(title, slug, catMap)
 
-		// Upload raw file to MinIO — use slug for readable filenames
 		rawKey := fmt.Sprintf("raw/%s%s", slug, ext)
-		rawFile, _ := os.Open(filePath)
-		stat, _ := rawFile.Stat()
 		mimeType := detectMime(ext)
-		if err := store.Upload(ctx, rawKey, rawFile, stat.Size(), mimeType); err != nil {
-			log.Printf("  failed to upload raw file: %v", err)
+		if err := uploadFile(ctx, store, rawKey, filePath, mimeType); err != nil {
+			failed++
+			log.Printf("  failed to upload raw file %s: %v", fileName, err)
+			continue
 		}
-		rawFile.Close()
 
 		// Check for matching thumbnail image
 		var thumbnailKey *string
@@ -136,7 +135,7 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 				optPath := filepath.Join(tmpDir, slug+".webp")
 				uploadPath := imgPath
 				uploadMime := "image/jpeg"
-				if _, _, err := imageopt.OptimizeWebP(imgPath, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
+				if _, _, err := imageopt.OptimizeWebP(ctx, imgPath, optPath, imageopt.DefaultThumbMaxDim, imageopt.DefaultQuality); err == nil {
 					uploadPath = optPath
 					uploadMime = "image/webp"
 				}
@@ -165,9 +164,10 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 			publishedAt = time.UnixMilli(ts)
 		}
 
-		var pgPlotCount pgtype.Int4
+		var pgPlotCount *int32
 		if plotCount > 0 {
-			pgPlotCount = pgtype.Int4{Int32: int32(plotCount), Valid: true}
+			v := int32(plotCount)
+			pgPlotCount = &v
 		}
 
 		_, err = queries.CreateArticle(ctx, db.CreateArticleParams{
@@ -189,20 +189,26 @@ func migrateLocal(ctx context.Context, queries *db.Queries, store *storage.Clien
 			OriginalFileKey:  &rawKey,
 			OriginalFileName: &fileName,
 			OriginalFileMime: &mimeType,
-			LegacyID:         pgtype.Int4{},
-			LegacyFileKey:    nil,
 			CategoryID:       nilIfEmpty(categoryID),
 			PublishedAt:      &publishedAt,
 		})
 		if err != nil {
-			log.Printf("  failed to create article: %v", err)
-		} else {
-			counter++
-			fmt.Printf("  ✓ created: %s\n", slug)
+			failed++
+			log.Printf("  failed to create article %s: %v", slug, err)
+			if delErr := store.Delete(ctx, rawKey); delErr != nil {
+				log.Printf("  clean up %s: %v", rawKey, delErr)
+			}
+			continue
 		}
+		counter++
+		fmt.Printf("  ✓ created: %s\n", slug)
 	}
 
-	fmt.Printf("\nlocal migration complete: %d articles imported\n", counter)
+	fmt.Printf("\nlocal migration complete: %d articles imported, %d failed\n", counter, failed)
+	if failed > 0 {
+		return fmt.Errorf("%d files failed to import", failed)
+	}
+	return nil
 }
 
 // slugToTitle converts a slug back to a human-readable Vietnamese title.
@@ -212,71 +218,71 @@ func slugToTitle(slug string) string {
 
 	// Capitalize common Vietnamese title words
 	replacements := map[string]string{
-		"thong bao":        "Thông Báo",
-		"dau gia":          "Đấu Giá",
-		"qsd":              "QSD",
+		"thong bao":         "Thông Báo",
+		"dau gia":           "Đấu Giá",
+		"qsd":               "QSD",
 		"quyen su dung dat": "Quyền Sử Dụng Đất",
-		"thua dat":         "Thửa Đất",
-		"tai xa":           "Tại Xã",
-		"tai":              "Tại",
-		"xa":               "Xã",
-		"huyen":            "Huyện",
-		"tinh":             "Tỉnh",
-		"vinh phuc":        "Vĩnh Phúc",
-		"vinh tuong":       "Vĩnh Tường",
-		"lap thach":        "Lập Thạch",
-		"tam duong":        "Tam Dương",
-		"yen lac":          "Yên Lạc",
-		"binh xuyen":       "Bình Xuyên",
-		"vinh yen":         "Vĩnh Yên",
-		"phuc yen":         "Phúc Yên",
-		"song lo":          "Sông Lô",
-		"tam dao":          "Tam Đảo",
-		"vinh son":         "Vĩnh Sơn",
-		"vu di":            "Vũ Di",
-		"binh duong":       "Bình Dương",
-		"van quan":         "Vân Quán",
-		"dong ich":         "Đồng Ích",
-		"phu da":           "Phú Đa",
-		"hoi thinh":        "Hội Thịnh",
-		"tien lu":          "Tiến Lữ",
-		"tan tien":         "Tân Tiến",
-		"tan ngoc":         "Tân Ngọc",
-		"thong nhat":       "Thống Nhất",
-		"bac ke":           "Bắc Kẽ",
-		"ba hien":          "Ba Hiền",
-		"lien bao":         "Liên Bảo",
-		"phu chien":        "Phú Chiến",
-		"khu":              "Khu",
-		"cau tram":         "Cầu Trạm",
-		"dat o":            "Đất Ở",
-		"dat":              "Đất",
-		"ban":              "Bán",
-		"tha":              "THA",
-		"tai san":          "Tài Sản",
-		"thi hanh an":      "Thi Hành Án",
-		"thanh ly":         "Thanh Lý",
-		"dam bao":          "Đảm Bảo",
-		"agribank":         "Agribank",
-		"cn":               "CN",
-		"ubnd":             "UBND",
-		"cho thue":         "Cho Thuê",
-		"tdp":              "TDP",
-		"tt":               "TT",
-		"do":               "Do",
-		"de":               "Để",
-		"cua":              "Của",
-		"vu":               "Vụ",
-		"cong ty":          "Công Ty",
-		"thu do":           "Thủ Đô",
-		"hc":               "HC",
-		"xe":               "Xe",
-		"yaris":            "Yaris",
-		"may phat dien":    "Máy Phát Điện",
-		"phuong tien":      "Phương Tiện",
-		"o to":             "Ô Tô",
-		"nhnn":             "NHNN",
-		"cctha":            "CCTHA",
+		"thua dat":          "Thửa Đất",
+		"tai xa":            "Tại Xã",
+		"tai":               "Tại",
+		"xa":                "Xã",
+		"huyen":             "Huyện",
+		"tinh":              "Tỉnh",
+		"vinh phuc":         "Vĩnh Phúc",
+		"vinh tuong":        "Vĩnh Tường",
+		"lap thach":         "Lập Thạch",
+		"tam duong":         "Tam Dương",
+		"yen lac":           "Yên Lạc",
+		"binh xuyen":        "Bình Xuyên",
+		"vinh yen":          "Vĩnh Yên",
+		"phuc yen":          "Phúc Yên",
+		"song lo":           "Sông Lô",
+		"tam dao":           "Tam Đảo",
+		"vinh son":          "Vĩnh Sơn",
+		"vu di":             "Vũ Di",
+		"binh duong":        "Bình Dương",
+		"van quan":          "Vân Quán",
+		"dong ich":          "Đồng Ích",
+		"phu da":            "Phú Đa",
+		"hoi thinh":         "Hội Thịnh",
+		"tien lu":           "Tiến Lữ",
+		"tan tien":          "Tân Tiến",
+		"tan ngoc":          "Tân Ngọc",
+		"thong nhat":        "Thống Nhất",
+		"bac ke":            "Bắc Kẽ",
+		"ba hien":           "Ba Hiền",
+		"lien bao":          "Liên Bảo",
+		"phu chien":         "Phú Chiến",
+		"khu":               "Khu",
+		"cau tram":          "Cầu Trạm",
+		"dat o":             "Đất Ở",
+		"dat":               "Đất",
+		"ban":               "Bán",
+		"tha":               "THA",
+		"tai san":           "Tài Sản",
+		"thi hanh an":       "Thi Hành Án",
+		"thanh ly":          "Thanh Lý",
+		"dam bao":           "Đảm Bảo",
+		"agribank":          "Agribank",
+		"cn":                "CN",
+		"ubnd":              "UBND",
+		"cho thue":          "Cho Thuê",
+		"tdp":               "TDP",
+		"tt":                "TT",
+		"do":                "Do",
+		"de":                "Để",
+		"cua":               "Của",
+		"vu":                "Vụ",
+		"cong ty":           "Công Ty",
+		"thu do":            "Thủ Đô",
+		"hc":                "HC",
+		"xe":                "Xe",
+		"yaris":             "Yaris",
+		"may phat dien":     "Máy Phát Điện",
+		"phuong tien":       "Phương Tiện",
+		"o to":              "Ô Tô",
+		"nhnn":              "NHNN",
+		"cctha":             "CCTHA",
 	}
 
 	// Apply longer replacements first

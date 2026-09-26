@@ -1,42 +1,42 @@
 # Stage 1: Build
-FROM golang:1.23-alpine AS builder
-
-RUN apk add --no-cache gcc musl-dev vips-dev git
-
-# Install sqlc — pinned to v1.27.0, last release that builds on Go 1.23.
-# Newer sqlc (v1.31+) requires Go 1.26+. Bump both together when upgrading.
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0
+FROM golang:1.26-alpine3.22 AS builder
 
 WORKDIR /app
-COPY go.mod ./
-COPY go.sum* ./
-COPY . .
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Generate type-safe DB code, then resolve deps, then build
-RUN sqlc generate
-RUN go mod tidy
-RUN CGO_ENABLED=1 go build -o bin/api ./cmd/api/
+COPY . .
+# sqlc output is committed; the build must not regenerate or re-resolve anything.
+RUN CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags="-s -w" -o bin/api ./cmd/api/
 
 # Stage 2: Runtime
-FROM alpine:3.19
+FROM alpine:3.22
+
+ARG MAMMOTH_VERSION=1.12.3
+ARG MIGRATE_VERSION=v4.20.1
+ARG MIGRATE_SHA256=b1e13121d4178b7804a9fb29dca62d57b732390f7e5ae33f2cd65e9b192e1bd4
 
 RUN apk add --no-cache \
     ca-certificates \
     curl \
     nodejs npm \
     poppler-utils \
-    vips \
     vips-tools \
-    && npm install -g mammoth \
+    && npm install -g "mammoth@${MAMMOTH_VERSION}" \
     && npm cache clean --force \
-    && curl -fsSL https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz \
-       | tar -xz -C /usr/local/bin migrate \
-    && chmod +x /usr/local/bin/migrate
+    && apk del npm \
+    && curl -fsSL -o /tmp/migrate.tgz \
+       "https://github.com/golang-migrate/migrate/releases/download/${MIGRATE_VERSION}/migrate.linux-amd64.tar.gz" \
+    && echo "${MIGRATE_SHA256}  /tmp/migrate.tgz" | sha256sum -c - \
+    && tar -xz -C /usr/local/bin -f /tmp/migrate.tgz migrate \
+    && rm /tmp/migrate.tgz \
+    && adduser -D -H -u 10001 app
 
 WORKDIR /app
 COPY --from=builder /app/bin/api .
 COPY --from=builder /app/migrations ./migrations
 
+USER app
 EXPOSE 8080
 
 CMD ["/app/api"]

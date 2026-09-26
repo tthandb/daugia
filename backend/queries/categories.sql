@@ -21,7 +21,7 @@ UPDATE categories SET
 WHERE id = @id
 RETURNING *;
 
--- name: DeleteCategory :exec
+-- name: DeleteCategory :execrows
 DELETE FROM categories WHERE id = $1;
 
 -- name: UpsertCategory :one
@@ -32,3 +32,8 @@ ON CONFLICT (slug) DO UPDATE SET
     color = EXCLUDED.color,
     sort_order = EXCLUDED.sort_order
 RETURNING *;
+
+-- name: InsertCategoryIfMissing :exec
+INSERT INTO categories (id, name, slug, color, sort_order)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (slug) DO NOTHING;

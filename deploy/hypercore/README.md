@@ -1,6 +1,6 @@
 # Deploy: HyperCore NVMe VPS HYPER-2 + Object Storage
 
-Single-VM deployment for the **ĐẤUGIÁ** Go API ([github.com/tthandb/daugia](https://github.com/tthandb/daugia), branch `new-dau-gia`).
+Single-VM deployment for the **ĐẤUGIÁ** Go API ([github.com/tthandb/daugia](https://github.com/tthandb/daugia), branch `main`).
 
 - **VPS**: HyperCore NVMe VPS HYPER-2 — 2 vCPU / 4 GB / 40 GB NVMe / 200 Mbps unlimited
 - **Region**: Ho Chi Minh 2
@@ -67,7 +67,7 @@ Log out, back in as `daugia`.
 
 ```bash
 ssh daugia@<HYPERCORE_IP>
-git clone --branch new-dau-gia https://github.com/tthandb/daugia.git
+git clone https://github.com/tthandb/daugia.git
 cd daugia/deploy/hypercore
 
 cp .env.example .env
@@ -98,25 +98,25 @@ The shared Caddy reads `deploy/shared/conf.d/*.caddy`. The daugia route is alrea
 defined in `conf.d/api.daugiavinhyen.com.caddy`; it auto-issues TLS via Let's Encrypt on
 first request.
 
-### 7. Boot daugia
+### 7. Migrate, seed, then boot daugia
+
+Run migrations and the seed before the API serves traffic; the API does not
+check the schema on start, so every route would 500 until migrated.
 
 ```bash
 cd ~/daugia/deploy/hypercore
-docker compose up -d
+docker compose pull
+docker compose up -d postgres
+docker compose run --rm --no-deps -T api sh -c 'migrate -path /app/migrations -database "$DATABASE_URL" up'
+docker compose run --rm --no-deps -e ADMIN_EMAIL -e ADMIN_PASSWORD api /app/api seed
+docker compose up -d api
 docker compose logs -f api
 ```
 
-### 8. Run migrations + seed
-
-```bash
-docker compose exec api migrate -path /app/migrations \
-  -database "$DATABASE_URL" up
-
-docker compose exec api /app/api seed
-```
-
-> `migrate` is bundled into the runtime image (added to `backend/Dockerfile`),
-> so the command above works without extra setup.
+> `migrate` is bundled into the runtime image. `ADMIN_EMAIL`/`ADMIN_PASSWORD`
+> are read from your shell (`export` them or `set -a; . ./.env; set +a` first);
+> they are intentionally not part of the long-running container's environment.
+> Re-running `seed` is safe: it never overwrites categories the admin has edited.
 
 ### 9. Update Vercel frontend
 
@@ -145,12 +145,17 @@ crontab -e
 ## Day-to-day
 
 ```bash
-# Deploy new backend code
-cd ~/daugia && git pull origin new-dau-gia
+# Deploy new backend code — normally CI does this on push to main.
+# Manual equivalent (the image is built by CI and published to GHCR):
+cd ~/daugia && git pull origin main
 cd deploy/hypercore
-docker compose build api
-docker compose up -d api
+export IMAGE_TAG=sha-<short-sha>   # or keep the value in .env
+docker compose pull api
+docker compose run --rm --no-deps -T api sh -c 'migrate -path /app/migrations -database "$DATABASE_URL" up'
+docker compose up -d --no-deps api
 docker compose logs -f api
+
+# Roll back: set IMAGE_TAG in .env to the previous sha and `docker compose up -d --no-deps api`.
 
 # Resize VM (if you outgrow HYPER-2)
 # Done in HyperCore dashboard → Resize → HYPER-3 (4 vCPU / 8 GB / 80 GB) — ~30 sec, no data loss

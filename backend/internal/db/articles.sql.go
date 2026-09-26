@@ -8,8 +8,6 @@ package db
 import (
 	"context"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const adminCountArticles = `-- name: AdminCountArticles :one
@@ -37,17 +35,15 @@ func (q *Queries) AdminCountArticlesByStatus(ctx context.Context, status string)
 
 const adminListArticles = `-- name: AdminListArticles :many
 
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE ($3::text IS NULL OR a.status = $3::text)
-ORDER BY a.created_at DESC
+ORDER BY a.created_at DESC, a.id
 LIMIT $1 OFFSET $2
 `
 
@@ -58,41 +54,27 @@ type AdminListArticlesParams struct {
 }
 
 type AdminListArticlesRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 // Admin queries
@@ -111,33 +93,19 @@ func (q *Queries) AdminListArticles(ctx context.Context, arg AdminListArticlesPa
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -163,13 +131,16 @@ func (q *Queries) AdminTotalViews(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
-const archiveArticle = `-- name: ArchiveArticle :exec
+const archiveArticle = `-- name: ArchiveArticle :execrows
 UPDATE articles SET status = 'ARCHIVED' WHERE id = $1
 `
 
-func (q *Queries) ArchiveArticle(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, archiveArticle, id)
-	return err
+func (q *Queries) ArchiveArticle(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveArticle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const countPublishedArticles = `-- name: CountPublishedArticles :one
@@ -221,7 +192,7 @@ func (q *Queries) CountPublishedArticlesByTag(ctx context.Context, tagID string)
 const countSearchArticles = `-- name: CountSearchArticles :one
 SELECT count(*) FROM articles
 WHERE status = 'PUBLISHED'
-  AND search_vector @@ plainto_tsquery('simple', $1)
+  AND search_vector @@ plainto_tsquery('vi', $1)
 `
 
 func (q *Queries) CountSearchArticles(ctx context.Context, plaintoTsquery string) (int64, error) {
@@ -254,63 +225,63 @@ RETURNING id, title, slug, description, author_name, content_html, content_plain
 `
 
 type CreateArticleParams struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	CategoryID       *string     `json:"category_id"`
-	PublishedAt      *time.Time  `json:"published_at"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Slug             string     `json:"slug"`
+	Description      string     `json:"description"`
+	AuthorName       string     `json:"author_name"`
+	ContentHtml      string     `json:"content_html"`
+	ContentPlain     string     `json:"content_plain"`
+	Status           string     `json:"status"`
+	Province         *string    `json:"province"`
+	District         *string    `json:"district"`
+	Ward             *string    `json:"ward"`
+	AssetType        *string    `json:"asset_type"`
+	PlotCount        *int32     `json:"plot_count"`
+	TotalArea        *string    `json:"total_area"`
+	ThumbnailKey     *string    `json:"thumbnail_key"`
+	OriginalFileKey  *string    `json:"original_file_key"`
+	OriginalFileName *string    `json:"original_file_name"`
+	OriginalFileMime *string    `json:"original_file_mime"`
+	LegacyID         *int32     `json:"legacy_id"`
+	LegacyFileKey    *string    `json:"legacy_file_key"`
+	CategoryID       *string    `json:"category_id"`
+	PublishedAt      *time.Time `json:"published_at"`
 }
 
 type CreateArticleRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Slug             string     `json:"slug"`
+	Description      string     `json:"description"`
+	AuthorName       string     `json:"author_name"`
+	ContentHtml      string     `json:"content_html"`
+	ContentPlain     string     `json:"content_plain"`
+	Status           string     `json:"status"`
+	PublishedAt      *time.Time `json:"published_at"`
+	Province         *string    `json:"province"`
+	District         *string    `json:"district"`
+	Ward             *string    `json:"ward"`
+	AssetType        *string    `json:"asset_type"`
+	PlotCount        *int32     `json:"plot_count"`
+	TotalArea        *string    `json:"total_area"`
+	ThumbnailKey     *string    `json:"thumbnail_key"`
+	OriginalFileKey  *string    `json:"original_file_key"`
+	OriginalFileName *string    `json:"original_file_name"`
+	OriginalFileMime *string    `json:"original_file_mime"`
+	LegacyID         *int32     `json:"legacy_id"`
+	LegacyFileKey    *string    `json:"legacy_file_key"`
+	ViewCount        int32      `json:"view_count"`
+	CategoryID       *string    `json:"category_id"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	MetaDescription  *string    `json:"meta_description"`
+	AuctionStart     *time.Time `json:"auction_start"`
+	AuctionEnd       *time.Time `json:"auction_end"`
+	VenueName        *string    `json:"venue_name"`
+	VenueAddress     *string    `json:"venue_address"`
+	StartingPrice    *int64     `json:"starting_price"`
+	DepositAmount    *int64     `json:"deposit_amount"`
 }
 
 func (q *Queries) CreateArticle(ctx context.Context, arg CreateArticleParams) (CreateArticleRow, error) {
@@ -376,66 +347,53 @@ func (q *Queries) CreateArticle(ctx context.Context, arg CreateArticleParams) (C
 	return i, err
 }
 
-const deleteArticle = `-- name: DeleteArticle :exec
+const deleteArticle = `-- name: DeleteArticle :execrows
 DELETE FROM articles WHERE id = $1
 `
 
-func (q *Queries) DeleteArticle(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteArticle, id)
-	return err
+func (q *Queries) DeleteArticle(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteArticle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const featuredArticles = `-- name: FeaturedArticles :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE a.status = 'PUBLISHED' AND a.thumbnail_key IS NOT NULL
-ORDER BY a.published_at DESC
+ORDER BY a.published_at DESC, a.id
 LIMIT $1
 `
 
 type FeaturedArticlesRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 func (q *Queries) FeaturedArticles(ctx context.Context, limit int32) ([]FeaturedArticlesRow, error) {
@@ -453,33 +411,19 @@ func (q *Queries) FeaturedArticles(ctx context.Context, limit int32) ([]Featured
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -508,41 +452,41 @@ WHERE a.id = $1
 `
 
 type GetArticleByIDRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Slug             string     `json:"slug"`
+	Description      string     `json:"description"`
+	AuthorName       string     `json:"author_name"`
+	ContentHtml      string     `json:"content_html"`
+	ContentPlain     string     `json:"content_plain"`
+	Status           string     `json:"status"`
+	PublishedAt      *time.Time `json:"published_at"`
+	Province         *string    `json:"province"`
+	District         *string    `json:"district"`
+	Ward             *string    `json:"ward"`
+	AssetType        *string    `json:"asset_type"`
+	PlotCount        *int32     `json:"plot_count"`
+	TotalArea        *string    `json:"total_area"`
+	ThumbnailKey     *string    `json:"thumbnail_key"`
+	OriginalFileKey  *string    `json:"original_file_key"`
+	OriginalFileName *string    `json:"original_file_name"`
+	OriginalFileMime *string    `json:"original_file_mime"`
+	LegacyID         *int32     `json:"legacy_id"`
+	LegacyFileKey    *string    `json:"legacy_file_key"`
+	ViewCount        int32      `json:"view_count"`
+	CategoryID       *string    `json:"category_id"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	MetaDescription  *string    `json:"meta_description"`
+	AuctionStart     *time.Time `json:"auction_start"`
+	AuctionEnd       *time.Time `json:"auction_end"`
+	VenueName        *string    `json:"venue_name"`
+	VenueAddress     *string    `json:"venue_address"`
+	StartingPrice    *int64     `json:"starting_price"`
+	DepositAmount    *int64     `json:"deposit_amount"`
+	CategoryName     *string    `json:"category_name"`
+	CategorySlug     *string    `json:"category_slug"`
+	CategoryColor    *string    `json:"category_color"`
 }
 
 func (q *Queries) GetArticleByID(ctx context.Context, id string) (GetArticleByIDRow, error) {
@@ -602,41 +546,41 @@ WHERE a.slug = $1 AND a.status = 'PUBLISHED'
 `
 
 type GetArticleBySlugRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Slug             string     `json:"slug"`
+	Description      string     `json:"description"`
+	AuthorName       string     `json:"author_name"`
+	ContentHtml      string     `json:"content_html"`
+	ContentPlain     string     `json:"content_plain"`
+	Status           string     `json:"status"`
+	PublishedAt      *time.Time `json:"published_at"`
+	Province         *string    `json:"province"`
+	District         *string    `json:"district"`
+	Ward             *string    `json:"ward"`
+	AssetType        *string    `json:"asset_type"`
+	PlotCount        *int32     `json:"plot_count"`
+	TotalArea        *string    `json:"total_area"`
+	ThumbnailKey     *string    `json:"thumbnail_key"`
+	OriginalFileKey  *string    `json:"original_file_key"`
+	OriginalFileName *string    `json:"original_file_name"`
+	OriginalFileMime *string    `json:"original_file_mime"`
+	LegacyID         *int32     `json:"legacy_id"`
+	LegacyFileKey    *string    `json:"legacy_file_key"`
+	ViewCount        int32      `json:"view_count"`
+	CategoryID       *string    `json:"category_id"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	MetaDescription  *string    `json:"meta_description"`
+	AuctionStart     *time.Time `json:"auction_start"`
+	AuctionEnd       *time.Time `json:"auction_end"`
+	VenueName        *string    `json:"venue_name"`
+	VenueAddress     *string    `json:"venue_address"`
+	StartingPrice    *int64     `json:"starting_price"`
+	DepositAmount    *int64     `json:"deposit_amount"`
+	CategoryName     *string    `json:"category_name"`
+	CategorySlug     *string    `json:"category_slug"`
+	CategoryColor    *string    `json:"category_color"`
 }
 
 func (q *Queries) GetArticleBySlug(ctx context.Context, slug string) (GetArticleBySlugRow, error) {
@@ -682,6 +626,22 @@ func (q *Queries) GetArticleBySlug(ctx context.Context, slug string) (GetArticle
 	return i, err
 }
 
+const getArticleThumbnail = `-- name: GetArticleThumbnail :one
+SELECT thumbnail_key, status FROM articles WHERE id = $1
+`
+
+type GetArticleThumbnailRow struct {
+	ThumbnailKey *string `json:"thumbnail_key"`
+	Status       string  `json:"status"`
+}
+
+func (q *Queries) GetArticleThumbnail(ctx context.Context, id string) (GetArticleThumbnailRow, error) {
+	row := q.db.QueryRow(ctx, getArticleThumbnail, id)
+	var i GetArticleThumbnailRow
+	err := row.Scan(&i.ThumbnailKey, &i.Status)
+	return i, err
+}
+
 const incrementViewCount = `-- name: IncrementViewCount :exec
 UPDATE articles SET view_count = view_count + 1 WHERE id = $1
 `
@@ -721,17 +681,15 @@ func (q *Queries) ListAllArticlesSlugs(ctx context.Context) ([]ListAllArticlesSl
 }
 
 const listPublishedArticles = `-- name: ListPublishedArticles :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE a.status = 'PUBLISHED'
-ORDER BY a.published_at DESC
+ORDER BY a.published_at DESC, a.id
 LIMIT $1 OFFSET $2
 `
 
@@ -741,41 +699,27 @@ type ListPublishedArticlesParams struct {
 }
 
 type ListPublishedArticlesRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 func (q *Queries) ListPublishedArticles(ctx context.Context, arg ListPublishedArticlesParams) ([]ListPublishedArticlesRow, error) {
@@ -793,33 +737,19 @@ func (q *Queries) ListPublishedArticles(ctx context.Context, arg ListPublishedAr
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -835,17 +765,15 @@ func (q *Queries) ListPublishedArticles(ctx context.Context, arg ListPublishedAr
 }
 
 const listPublishedArticlesByCategory = `-- name: ListPublishedArticlesByCategory :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE a.status = 'PUBLISHED' AND a.category_id = $1
-ORDER BY a.published_at DESC
+ORDER BY a.published_at DESC, a.id
 LIMIT $2 OFFSET $3
 `
 
@@ -856,41 +784,27 @@ type ListPublishedArticlesByCategoryParams struct {
 }
 
 type ListPublishedArticlesByCategoryRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 func (q *Queries) ListPublishedArticlesByCategory(ctx context.Context, arg ListPublishedArticlesByCategoryParams) ([]ListPublishedArticlesByCategoryRow, error) {
@@ -908,33 +822,19 @@ func (q *Queries) ListPublishedArticlesByCategory(ctx context.Context, arg ListP
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -950,17 +850,15 @@ func (q *Queries) ListPublishedArticlesByCategory(ctx context.Context, arg ListP
 }
 
 const listPublishedArticlesByProvince = `-- name: ListPublishedArticlesByProvince :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE a.status = 'PUBLISHED' AND a.province = $1
-ORDER BY a.published_at DESC
+ORDER BY a.published_at DESC, a.id
 LIMIT $2 OFFSET $3
 `
 
@@ -971,41 +869,27 @@ type ListPublishedArticlesByProvinceParams struct {
 }
 
 type ListPublishedArticlesByProvinceRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 func (q *Queries) ListPublishedArticlesByProvince(ctx context.Context, arg ListPublishedArticlesByProvinceParams) ([]ListPublishedArticlesByProvinceRow, error) {
@@ -1023,33 +907,19 @@ func (q *Queries) ListPublishedArticlesByProvince(ctx context.Context, arg ListP
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -1065,18 +935,16 @@ func (q *Queries) ListPublishedArticlesByProvince(ctx context.Context, arg ListP
 }
 
 const listPublishedArticlesByTag = `-- name: ListPublishedArticlesByTag :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 JOIN article_tags at ON a.id = at.article_id
 WHERE a.status = 'PUBLISHED' AND at.tag_id = $1
-ORDER BY a.published_at DESC
+ORDER BY a.published_at DESC, a.id
 LIMIT $2 OFFSET $3
 `
 
@@ -1087,41 +955,27 @@ type ListPublishedArticlesByTagParams struct {
 }
 
 type ListPublishedArticlesByTagRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
 }
 
 func (q *Queries) ListPublishedArticlesByTag(ctx context.Context, arg ListPublishedArticlesByTagParams) ([]ListPublishedArticlesByTagRow, error) {
@@ -1139,33 +993,19 @@ func (q *Queries) ListPublishedArticlesByTag(ctx context.Context, arg ListPublis
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -1180,29 +1020,30 @@ func (q *Queries) ListPublishedArticlesByTag(ctx context.Context, arg ListPublis
 	return items, nil
 }
 
-const publishArticle = `-- name: PublishArticle :exec
-UPDATE articles SET status = 'PUBLISHED', published_at = now() WHERE id = $1
+const publishArticle = `-- name: PublishArticle :execrows
+UPDATE articles SET status = 'PUBLISHED', published_at = COALESCE(published_at, now()) WHERE id = $1
 `
 
-func (q *Queries) PublishArticle(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, publishArticle, id)
-	return err
+func (q *Queries) PublishArticle(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, publishArticle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const searchArticles = `-- name: SearchArticles :many
-SELECT a.id, a.title, a.slug, a.description, a.author_name, a.content_html, a.content_plain,
-       a.status, a.published_at, a.province, a.district, a.ward, a.asset_type, a.plot_count,
-       a.total_area, a.thumbnail_key, a.original_file_key, a.original_file_name, a.original_file_mime,
-       a.legacy_id, a.legacy_file_key, a.view_count, a.category_id, a.created_at, a.updated_at,
-       a.meta_description, a.auction_start, a.auction_end, a.venue_name, a.venue_address,
-       a.starting_price, a.deposit_amount,
+SELECT a.id, a.title, a.slug, a.description, a.author_name,
+       a.status, a.published_at, a.province, a.district, a.ward,
+       a.thumbnail_key, a.view_count, a.category_id, a.created_at, a.updated_at,
+       a.auction_start, a.auction_end, a.starting_price,
        c.name as category_name, c.slug as category_slug, c.color as category_color,
-       ts_rank(a.search_vector, plainto_tsquery('simple', $1)) as rank
+       ts_rank(a.search_vector, plainto_tsquery('vi', $1)) as rank
 FROM articles a
 LEFT JOIN categories c ON a.category_id = c.id
 WHERE a.status = 'PUBLISHED'
-  AND a.search_vector @@ plainto_tsquery('simple', $1)
-ORDER BY rank DESC
+  AND a.search_vector @@ plainto_tsquery('vi', $1)
+ORDER BY rank DESC, a.published_at DESC, a.id
 LIMIT $2 OFFSET $3
 `
 
@@ -1213,42 +1054,28 @@ type SearchArticlesParams struct {
 }
 
 type SearchArticlesRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
-	CategoryName     *string     `json:"category_name"`
-	CategorySlug     *string     `json:"category_slug"`
-	CategoryColor    *string     `json:"category_color"`
-	Rank             float32     `json:"rank"`
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Slug          string     `json:"slug"`
+	Description   string     `json:"description"`
+	AuthorName    string     `json:"author_name"`
+	Status        string     `json:"status"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Province      *string    `json:"province"`
+	District      *string    `json:"district"`
+	Ward          *string    `json:"ward"`
+	ThumbnailKey  *string    `json:"thumbnail_key"`
+	ViewCount     int32      `json:"view_count"`
+	CategoryID    *string    `json:"category_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	AuctionStart  *time.Time `json:"auction_start"`
+	AuctionEnd    *time.Time `json:"auction_end"`
+	StartingPrice *int64     `json:"starting_price"`
+	CategoryName  *string    `json:"category_name"`
+	CategorySlug  *string    `json:"category_slug"`
+	CategoryColor *string    `json:"category_color"`
+	Rank          float32    `json:"rank"`
 }
 
 func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) ([]SearchArticlesRow, error) {
@@ -1266,33 +1093,19 @@ func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) 
 			&i.Slug,
 			&i.Description,
 			&i.AuthorName,
-			&i.ContentHtml,
-			&i.ContentPlain,
 			&i.Status,
 			&i.PublishedAt,
 			&i.Province,
 			&i.District,
 			&i.Ward,
-			&i.AssetType,
-			&i.PlotCount,
-			&i.TotalArea,
 			&i.ThumbnailKey,
-			&i.OriginalFileKey,
-			&i.OriginalFileName,
-			&i.OriginalFileMime,
-			&i.LegacyID,
-			&i.LegacyFileKey,
 			&i.ViewCount,
 			&i.CategoryID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.MetaDescription,
 			&i.AuctionStart,
 			&i.AuctionEnd,
-			&i.VenueName,
-			&i.VenueAddress,
 			&i.StartingPrice,
-			&i.DepositAmount,
 			&i.CategoryName,
 			&i.CategorySlug,
 			&i.CategoryColor,
@@ -1308,39 +1121,58 @@ func (q *Queries) SearchArticles(ctx context.Context, arg SearchArticlesParams) 
 	return items, nil
 }
 
-const unpublishArticle = `-- name: UnpublishArticle :exec
+const setArticleThumbnail = `-- name: SetArticleThumbnail :execrows
+UPDATE articles SET thumbnail_key = $1 WHERE id = $2
+`
+
+type SetArticleThumbnailParams struct {
+	ThumbnailKey *string `json:"thumbnail_key"`
+	ID           string  `json:"id"`
+}
+
+func (q *Queries) SetArticleThumbnail(ctx context.Context, arg SetArticleThumbnailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setArticleThumbnail, arg.ThumbnailKey, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unpublishArticle = `-- name: UnpublishArticle :execrows
 UPDATE articles SET status = 'DRAFT' WHERE id = $1
 `
 
-func (q *Queries) UnpublishArticle(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, unpublishArticle, id)
-	return err
+func (q *Queries) UnpublishArticle(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, unpublishArticle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateArticle = `-- name: UpdateArticle :one
 UPDATE articles SET
-    title = COALESCE($1, title),
-    slug = COALESCE($2, slug),
-    description = COALESCE($3, description),
-    author_name = COALESCE($4, author_name),
-    content_html = COALESCE($5, content_html),
-    content_plain = COALESCE($6, content_plain),
-    province = COALESCE($7, province),
-    district = COALESCE($8, district),
-    ward = COALESCE($9, ward),
-    asset_type = COALESCE($10, asset_type),
-    plot_count = COALESCE($11, plot_count),
-    total_area = COALESCE($12, total_area),
-    thumbnail_key = COALESCE($13, thumbnail_key),
-    category_id = COALESCE($14, category_id),
-    meta_description = COALESCE($15, meta_description),
-    auction_start = COALESCE($16, auction_start),
-    auction_end = COALESCE($17, auction_end),
-    venue_name = COALESCE($18, venue_name),
-    venue_address = COALESCE($19, venue_address),
-    starting_price = COALESCE($20, starting_price),
-    deposit_amount = COALESCE($21, deposit_amount)
-WHERE id = $22
+    title = CASE WHEN $1::bool THEN $2 ELSE title END,
+    slug = CASE WHEN $3::bool THEN $4 ELSE slug END,
+    description = CASE WHEN $5::bool THEN $6 ELSE description END,
+    author_name = CASE WHEN $7::bool THEN $8 ELSE author_name END,
+    content_html = CASE WHEN $9::bool THEN $10 ELSE content_html END,
+    content_plain = CASE WHEN $11::bool THEN $12 ELSE content_plain END,
+    province = CASE WHEN $13::bool THEN $14 ELSE province END,
+    district = CASE WHEN $15::bool THEN $16 ELSE district END,
+    ward = CASE WHEN $17::bool THEN $18 ELSE ward END,
+    asset_type = CASE WHEN $19::bool THEN $20 ELSE asset_type END,
+    plot_count = CASE WHEN $21::bool THEN $22 ELSE plot_count END,
+    total_area = CASE WHEN $23::bool THEN $24 ELSE total_area END,
+    category_id = CASE WHEN $25::bool THEN $26 ELSE category_id END,
+    meta_description = CASE WHEN $27::bool THEN $28 ELSE meta_description END,
+    auction_start = CASE WHEN $29::bool THEN $30 ELSE auction_start END,
+    auction_end = CASE WHEN $31::bool THEN $32 ELSE auction_end END,
+    venue_name = CASE WHEN $33::bool THEN $34 ELSE venue_name END,
+    venue_address = CASE WHEN $35::bool THEN $36 ELSE venue_address END,
+    starting_price = CASE WHEN $37::bool THEN $38 ELSE starting_price END,
+    deposit_amount = CASE WHEN $39::bool THEN $40 ELSE deposit_amount END
+WHERE id = $41
 RETURNING id, title, slug, description, author_name, content_html, content_plain,
           status, published_at, province, district, ward, asset_type, plot_count,
           total_area, thumbnail_key, original_file_key, original_file_name, original_file_mime,
@@ -1350,87 +1182,125 @@ RETURNING id, title, slug, description, author_name, content_html, content_plain
 `
 
 type UpdateArticleParams struct {
-	Title           *string     `json:"title"`
-	Slug            *string     `json:"slug"`
-	Description     *string     `json:"description"`
-	AuthorName      *string     `json:"author_name"`
-	ContentHtml     *string     `json:"content_html"`
-	ContentPlain    *string     `json:"content_plain"`
-	Province        *string     `json:"province"`
-	District        *string     `json:"district"`
-	Ward            *string     `json:"ward"`
-	AssetType       *string     `json:"asset_type"`
-	PlotCount       pgtype.Int4 `json:"plot_count"`
-	TotalArea       *string     `json:"total_area"`
-	ThumbnailKey    *string     `json:"thumbnail_key"`
-	CategoryID      *string     `json:"category_id"`
-	MetaDescription *string     `json:"meta_description"`
-	AuctionStart    *time.Time  `json:"auction_start"`
-	AuctionEnd      *time.Time  `json:"auction_end"`
-	VenueName       *string     `json:"venue_name"`
-	VenueAddress    *string     `json:"venue_address"`
-	StartingPrice   pgtype.Int8 `json:"starting_price"`
-	DepositAmount   pgtype.Int8 `json:"deposit_amount"`
-	ID              string      `json:"id"`
+	SetTitle           bool       `json:"set_title"`
+	Title              *string    `json:"title"`
+	SetSlug            bool       `json:"set_slug"`
+	Slug               *string    `json:"slug"`
+	SetDescription     bool       `json:"set_description"`
+	Description        *string    `json:"description"`
+	SetAuthorName      bool       `json:"set_author_name"`
+	AuthorName         *string    `json:"author_name"`
+	SetContentHtml     bool       `json:"set_content_html"`
+	ContentHtml        *string    `json:"content_html"`
+	SetContentPlain    bool       `json:"set_content_plain"`
+	ContentPlain       *string    `json:"content_plain"`
+	SetProvince        bool       `json:"set_province"`
+	Province           *string    `json:"province"`
+	SetDistrict        bool       `json:"set_district"`
+	District           *string    `json:"district"`
+	SetWard            bool       `json:"set_ward"`
+	Ward               *string    `json:"ward"`
+	SetAssetType       bool       `json:"set_asset_type"`
+	AssetType          *string    `json:"asset_type"`
+	SetPlotCount       bool       `json:"set_plot_count"`
+	PlotCount          *int32     `json:"plot_count"`
+	SetTotalArea       bool       `json:"set_total_area"`
+	TotalArea          *string    `json:"total_area"`
+	SetCategoryID      bool       `json:"set_category_id"`
+	CategoryID         *string    `json:"category_id"`
+	SetMetaDescription bool       `json:"set_meta_description"`
+	MetaDescription    *string    `json:"meta_description"`
+	SetAuctionStart    bool       `json:"set_auction_start"`
+	AuctionStart       *time.Time `json:"auction_start"`
+	SetAuctionEnd      bool       `json:"set_auction_end"`
+	AuctionEnd         *time.Time `json:"auction_end"`
+	SetVenueName       bool       `json:"set_venue_name"`
+	VenueName          *string    `json:"venue_name"`
+	SetVenueAddress    bool       `json:"set_venue_address"`
+	VenueAddress       *string    `json:"venue_address"`
+	SetStartingPrice   bool       `json:"set_starting_price"`
+	StartingPrice      *int64     `json:"starting_price"`
+	SetDepositAmount   bool       `json:"set_deposit_amount"`
+	DepositAmount      *int64     `json:"deposit_amount"`
+	ID                 string     `json:"id"`
 }
 
 type UpdateArticleRow struct {
-	ID               string      `json:"id"`
-	Title            string      `json:"title"`
-	Slug             string      `json:"slug"`
-	Description      string      `json:"description"`
-	AuthorName       string      `json:"author_name"`
-	ContentHtml      string      `json:"content_html"`
-	ContentPlain     string      `json:"content_plain"`
-	Status           string      `json:"status"`
-	PublishedAt      *time.Time  `json:"published_at"`
-	Province         *string     `json:"province"`
-	District         *string     `json:"district"`
-	Ward             *string     `json:"ward"`
-	AssetType        *string     `json:"asset_type"`
-	PlotCount        pgtype.Int4 `json:"plot_count"`
-	TotalArea        *string     `json:"total_area"`
-	ThumbnailKey     *string     `json:"thumbnail_key"`
-	OriginalFileKey  *string     `json:"original_file_key"`
-	OriginalFileName *string     `json:"original_file_name"`
-	OriginalFileMime *string     `json:"original_file_mime"`
-	LegacyID         pgtype.Int4 `json:"legacy_id"`
-	LegacyFileKey    *string     `json:"legacy_file_key"`
-	ViewCount        int32       `json:"view_count"`
-	CategoryID       *string     `json:"category_id"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	MetaDescription  *string     `json:"meta_description"`
-	AuctionStart     *time.Time  `json:"auction_start"`
-	AuctionEnd       *time.Time  `json:"auction_end"`
-	VenueName        *string     `json:"venue_name"`
-	VenueAddress     *string     `json:"venue_address"`
-	StartingPrice    pgtype.Int8 `json:"starting_price"`
-	DepositAmount    pgtype.Int8 `json:"deposit_amount"`
+	ID               string     `json:"id"`
+	Title            string     `json:"title"`
+	Slug             string     `json:"slug"`
+	Description      string     `json:"description"`
+	AuthorName       string     `json:"author_name"`
+	ContentHtml      string     `json:"content_html"`
+	ContentPlain     string     `json:"content_plain"`
+	Status           string     `json:"status"`
+	PublishedAt      *time.Time `json:"published_at"`
+	Province         *string    `json:"province"`
+	District         *string    `json:"district"`
+	Ward             *string    `json:"ward"`
+	AssetType        *string    `json:"asset_type"`
+	PlotCount        *int32     `json:"plot_count"`
+	TotalArea        *string    `json:"total_area"`
+	ThumbnailKey     *string    `json:"thumbnail_key"`
+	OriginalFileKey  *string    `json:"original_file_key"`
+	OriginalFileName *string    `json:"original_file_name"`
+	OriginalFileMime *string    `json:"original_file_mime"`
+	LegacyID         *int32     `json:"legacy_id"`
+	LegacyFileKey    *string    `json:"legacy_file_key"`
+	ViewCount        int32      `json:"view_count"`
+	CategoryID       *string    `json:"category_id"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	MetaDescription  *string    `json:"meta_description"`
+	AuctionStart     *time.Time `json:"auction_start"`
+	AuctionEnd       *time.Time `json:"auction_end"`
+	VenueName        *string    `json:"venue_name"`
+	VenueAddress     *string    `json:"venue_address"`
+	StartingPrice    *int64     `json:"starting_price"`
+	DepositAmount    *int64     `json:"deposit_amount"`
 }
 
 func (q *Queries) UpdateArticle(ctx context.Context, arg UpdateArticleParams) (UpdateArticleRow, error) {
 	row := q.db.QueryRow(ctx, updateArticle,
+		arg.SetTitle,
 		arg.Title,
+		arg.SetSlug,
 		arg.Slug,
+		arg.SetDescription,
 		arg.Description,
+		arg.SetAuthorName,
 		arg.AuthorName,
+		arg.SetContentHtml,
 		arg.ContentHtml,
+		arg.SetContentPlain,
 		arg.ContentPlain,
+		arg.SetProvince,
 		arg.Province,
+		arg.SetDistrict,
 		arg.District,
+		arg.SetWard,
 		arg.Ward,
+		arg.SetAssetType,
 		arg.AssetType,
+		arg.SetPlotCount,
 		arg.PlotCount,
+		arg.SetTotalArea,
 		arg.TotalArea,
-		arg.ThumbnailKey,
+		arg.SetCategoryID,
 		arg.CategoryID,
+		arg.SetMetaDescription,
 		arg.MetaDescription,
+		arg.SetAuctionStart,
 		arg.AuctionStart,
+		arg.SetAuctionEnd,
 		arg.AuctionEnd,
+		arg.SetVenueName,
 		arg.VenueName,
+		arg.SetVenueAddress,
 		arg.VenueAddress,
+		arg.SetStartingPrice,
 		arg.StartingPrice,
+		arg.SetDepositAmount,
 		arg.DepositAmount,
 		arg.ID,
 	)

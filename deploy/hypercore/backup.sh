@@ -7,10 +7,16 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# Load env so we get OBJECT_STORAGE_* + POSTGRES_*
-set -a
-. ./.env
-set +a
+# Read only the variables this script needs; never export the whole .env
+# (JWT_SECRET, admin password) into the environment of aws/docker/curl.
+envval() { grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | tr -d '"'; }
+POSTGRES_USER=$(envval POSTGRES_USER)
+POSTGRES_DB=$(envval POSTGRES_DB)
+OBJECT_STORAGE_ENDPOINT=$(envval OBJECT_STORAGE_ENDPOINT)
+OBJECT_STORAGE_BUCKET=$(envval OBJECT_STORAGE_BUCKET)
+HEARTBEAT_URL=$(envval HEARTBEAT_URL || true)
+: "${POSTGRES_USER:?missing in .env}" "${POSTGRES_DB:?missing in .env}"
+: "${OBJECT_STORAGE_ENDPOINT:?missing in .env}" "${OBJECT_STORAGE_BUCKET:?missing in .env}"
 
 # Optional dead-man's-switch: set HEARTBEAT_URL (e.g. a healthchecks.io ping URL)
 # in .env. We hit /start now and the base URL on success; if a run silently stops
@@ -31,6 +37,14 @@ DUMP="$TMP/db-$TS.sql.gz"
   docker compose exec -T postgres pg_dumpall -U "$POSTGRES_USER" --globals-only
   docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"
 } | gzip -9 > "$DUMP"
+
+# Refuse to upload a dump that is corrupt or implausibly small (an empty DB
+# dump is still several KB of schema).
+gzip -t "$DUMP"
+if [ "$(stat -c %s "$DUMP" 2>/dev/null || stat -f %z "$DUMP")" -lt 4096 ]; then
+  echo "dump suspiciously small, aborting" >&2
+  exit 1
+fi
 
 # Prune view_events older than 90 days so the append-only table can't grow
 # unbounded on the shared 40 GB disk. Best-effort; never fails the backup.

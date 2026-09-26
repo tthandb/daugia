@@ -7,8 +7,6 @@ package db
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCategory = `-- name: CreateCategory :one
@@ -46,13 +44,16 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 	return i, err
 }
 
-const deleteCategory = `-- name: DeleteCategory :exec
+const deleteCategory = `-- name: DeleteCategory :execrows
 DELETE FROM categories WHERE id = $1
 `
 
-func (q *Queries) DeleteCategory(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteCategory, id)
-	return err
+func (q *Queries) DeleteCategory(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCategory, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getCategoryByID = `-- name: GetCategoryByID :one
@@ -91,6 +92,31 @@ func (q *Queries) GetCategoryBySlug(ctx context.Context, slug string) (Category,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertCategoryIfMissing = `-- name: InsertCategoryIfMissing :exec
+INSERT INTO categories (id, name, slug, color, sort_order)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (slug) DO NOTHING
+`
+
+type InsertCategoryIfMissingParams struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Color     string `json:"color"`
+	SortOrder int32  `json:"sort_order"`
+}
+
+func (q *Queries) InsertCategoryIfMissing(ctx context.Context, arg InsertCategoryIfMissingParams) error {
+	_, err := q.db.Exec(ctx, insertCategoryIfMissing,
+		arg.ID,
+		arg.Name,
+		arg.Slug,
+		arg.Color,
+		arg.SortOrder,
+	)
+	return err
 }
 
 const listCategories = `-- name: ListCategories :many
@@ -136,11 +162,11 @@ RETURNING id, name, slug, color, sort_order, created_at, updated_at
 `
 
 type UpdateCategoryParams struct {
-	Name      *string     `json:"name"`
-	Slug      *string     `json:"slug"`
-	Color     *string     `json:"color"`
-	SortOrder pgtype.Int4 `json:"sort_order"`
-	ID        string      `json:"id"`
+	Name      *string `json:"name"`
+	Slug      *string `json:"slug"`
+	Color     *string `json:"color"`
+	SortOrder *int32  `json:"sort_order"`
+	ID        string  `json:"id"`
 }
 
 func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {

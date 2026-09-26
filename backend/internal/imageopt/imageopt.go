@@ -11,6 +11,7 @@
 package imageopt
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	// Side-effect imports register decoders so image.DecodeConfig can read
 	// dimensions from JPEG/PNG/GIF without needing libvips.
@@ -35,6 +37,9 @@ const (
 	// strikes the typical visual-vs-bytes balance; 90+ is overkill for
 	// thumbnails and roughly doubles file size.
 	DefaultQuality = 75
+	// optimizeTimeout bounds vipsthumbnail; a hostile image must not pin a
+	// worker forever.
+	optimizeTimeout = 30 * time.Second
 )
 
 // HasVipsThumbnail reports whether `vipsthumbnail` is available on PATH.
@@ -60,7 +65,7 @@ func HasVipsThumbnail() bool { return hasVipsThumbnail }
 // Stripping metadata (`strip`) is intentional: thumbnails are decoration,
 // not products of identifiable photographers, so EXIF/IPTC carry no SEO
 // value and only inflate bytes.
-func OptimizeWebP(srcPath, dstPath string, maxDim, quality int) (width, height int, err error) {
+func OptimizeWebP(ctx context.Context, srcPath, dstPath string, maxDim, quality int) (width, height int, err error) {
 	if maxDim <= 0 {
 		maxDim = DefaultThumbMaxDim
 	}
@@ -80,9 +85,13 @@ func OptimizeWebP(srcPath, dstPath string, maxDim, quality int) (width, height i
 	}
 
 	outArg := fmt.Sprintf("%s[Q=%d,strip]", absDst, quality)
-	sizeArg := strconv.Itoa(maxDim) + "x" + strconv.Itoa(maxDim)
+	// The trailing ">" tells vips to only ever shrink; small sources keep their size.
+	sizeArg := strconv.Itoa(maxDim) + "x" + strconv.Itoa(maxDim) + ">"
 
-	cmd := exec.Command("vipsthumbnail", srcPath, "-s", sizeArg, "-o", outArg)
+	ctx, cancel := context.WithTimeout(ctx, optimizeTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "vipsthumbnail", srcPath, "-s", sizeArg, "-o", outArg)
+	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, 0, fmt.Errorf("vipsthumbnail failed: %w (%s)", err, strings.TrimSpace(string(out)))

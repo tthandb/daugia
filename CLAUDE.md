@@ -33,7 +33,9 @@ go run ./cmd/api migrate-legacy   # Import 38 old articles from Supabase
 go run ./cmd/api migrate-local    # Import from a local dump
 go run ./cmd/api reoptimize-thumbs
 go build -o bin/api ./cmd/api     # Build binary
-go test ./...                     # Run all tests (parser + handler have tests)
+go test ./...                     # Unit tests; set TEST_DATABASE_URL for the DB-backed handler tests
+# e.g. docker run -d -p 55432:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_USER=test -e POSTGRES_DB=daugia_test postgres:16-alpine
+#      TEST_DATABASE_URL=postgres://test:test@localhost:55432/daugia_test?sslmode=disable go test ./...
 sqlc generate                     # Regenerate type-safe query code after SQL changes
 
 # Database Migrations (golang-migrate is bundled in the runtime image)
@@ -53,8 +55,8 @@ bun run type-check       # tsc --noEmit
 cd deploy/hypercore
 docker compose pull api && docker compose up -d --no-deps api   # (CI does this)
 docker compose exec -T api sh -c 'migrate -path /app/migrations -database "$DATABASE_URL" up'
-docker compose exec -T api /app/api seed                        # seed admin + categories
-./backup.sh                                                      # daily pg_dump → R2 (cron 03:00)
+docker compose run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD api /app/api seed   # seed admin + categories
+./backup.sh                                                      # daily pg_dump → R2 (cron 23:00 UTC = 06:00 ICT)
 
 # Frontend auto-deploys via Vercel on git push to main.
 ```
@@ -99,7 +101,6 @@ backend/
     handler/                 HTTP handlers (articles, images, attachments, auth, search)
     storage/                 MinIO client (upload, presigned URLs, delete)
     parser/                  Document parsing via os/exec (mammoth, pdftotext)
-    model/                   Go structs matching DB schema
     db/                      sqlc-generated query code
   migrations/                SQL migration files (schema + FTS trigger + indexes)
   sqlc.yaml                  sqlc config
@@ -134,15 +135,15 @@ k8s/                         DEAD reference only — not the deployment target
 - **Frontend UI**: Tailwind CSS + shadcn/ui + `@tailwindcss/typography`
 - **Frontend Hosting**: Vercel (free tier, auto-deploy, edge network)
 - **Analytics**: Vercel Analytics (free) + Go backend `view_events`
-- **Backend**: Go 1.22+, Chi router
-- **Database**: PostgreSQL 16 — native FTS (tsvector + GIN index + trigger, `'simple'` dictionary)
+- **Backend**: Go 1.26, Chi router
+- **Database**: PostgreSQL 16 — native FTS (tsvector + GIN index + trigger, custom `vi` config = unaccent + simple)
 - **DB Access**: pgx (driver) + sqlc (type-safe Go from SQL) + golang-migrate
 - **Auth**: golang-jwt + bcrypt — JWT in httpOnly cookie, Chi middleware
-- **Storage**: MinIO (minio-go SDK, S3-compatible, self-hosted)
+- **Storage**: Cloudflare R2 via minio-go SDK (S3-compatible)
 - **Parsing**: mammoth CLI (DOCX→HTML) + pdftotext/poppler-utils (PDF→text) via `os/exec`
-- **Images**: bimg/libvips → 800×450 webp thumbnails
-- **Backend Infra**: Kubernetes (k3s on Oracle Cloud Free Tier)
-- **Ingress**: nginx-ingress + cert-manager (Let's Encrypt)
+- **Images**: `vipsthumbnail` CLI (vips-tools) via `os/exec` → webp, max 1600px long edge, q=75
+- **Backend Infra**: Docker Compose on a single HyperCore VPS (non-root container, no-new-privileges)
+- **Ingress**: Caddy 2 (auto TLS via Let's Encrypt); it sets `X-Real-IP`, the only client-IP header the API trusts
 
 ---
 
@@ -171,13 +172,13 @@ computed live status badge (Sắp/Đang/Đã diễn ra), pine-on-paper with a di
 
 ## Critical Patterns
 
-**Document upload flow**: multipart/form-data → Go validates MIME → temp file → mammoth CLI / pdftotext via `os/exec` → bluemonday sanitize → strip to `contentPlain` → auto-generate description (first 200 chars) → minio-go `raw/` → bimg thumbnail → minio-go `thumbs/` → sqlc INSERT article → DB trigger updates `search_vector` → status DRAFT
+**Document upload flow**: multipart/form-data → Go validates MIME → temp file → mammoth CLI / pdftotext via `os/exec` → bluemonday sanitize → strip to `contentPlain` → auto-generate description (first 200 chars) → minio-go `raw/` → sqlc INSERT article (cover adopted later from the first gallery image) → DB trigger updates `search_vector` → status DRAFT
 
-**Article images**: Admin uploads images separately on edit page → bimg → webp → MinIO `images/{articleId}/` → `article_images` table → displayed as gallery on article detail page.
+**Article images**: Admin uploads images separately on edit page (field `file` or `images`) → magic-byte check → vipsthumbnail → webp → MinIO `images/{articleId}/` → `article_images` table → displayed as gallery on article detail page.
 
 **Article attachments**: Admin uploads supplementary files on edit page → MinIO `attachments/{articleId}/` → `article_attachments` table → displayed as download list ("Tài Liệu Đính Kèm") on article detail page.
 
-**FTS**: PostgreSQL native — `search_vector tsvector` column with GIN index, auto-updated by trigger. Uses **`'simple'` dictionary** (Vietnamese has no PostgreSQL dictionary). Weights: A=title, B=description, C=contentPlain, D=authorName. Query via sqlc raw query with `ts_rank`.
+**FTS**: PostgreSQL native — `search_vector tsvector` column with GIN index, auto-updated by trigger (only when title/description/contentPlain/authorName change). Uses the custom **`vi` text search config** = `unaccent` + `simple`, so "dau gia" matches "đấu giá". Weights: A=title, B=description, C=contentPlain, D=authorName. Query via sqlc with `ts_rank`.
 
 **Location metadata**: Articles have structured `province`/`district`/`ward` fields extracted from titles. Enables location-based filtering. Older notices reference tỉnh Vĩnh Phúc (preserved as historical record); new notices use tỉnh Phú Thọ following the 2025 merger.
 
@@ -191,6 +192,10 @@ computed live status badge (Sắp/Đang/Đã diễn ra), pine-on-paper with a di
 
 **Download button**: Every article detail page must show a download button at the bottom (after tags) — "Tải Xuống PDF" — charcoal bg, hover gold, with file metadata.
 
+**Admin PATCH semantics**: `PATCH /api/admin/articles/{id}` distinguishes absent keys (keep) from `null` / `""` (clear). `contentHtml` is re-sanitized server-side and `contentPlain` derived from it. Tags are set with `PUT /api/admin/articles/{id}/tags` `{ "tagIds": [] }`.
+
+**Unpublished files**: `/api/thumbs`, `/api/images`, `/api/articles/{id}/attachments/{attachmentId}` return 404 for DRAFT/ARCHIVED articles unless the request carries a valid admin cookie.
+
 **Auth protection**: Chi middleware on `/api/admin/*` routes validates JWT from httpOnly cookie. Next.js `middleware.ts` checks JWT cookie for `/admin/*` pages, redirects to `/login` if invalid. Single admin account, no self-registration.
 
 **SEO**: Public pages use `generateMetadata()` for `<title>`, `<meta description>`, Open Graph tags. Article detail pages include JSON-LD `Article` structured data. Dynamic `sitemap.xml` lists all published articles. `robots.txt` disallows `/admin/*`.
@@ -199,4 +204,4 @@ computed live status badge (Sắp/Đang/Đã diễn ra), pine-on-paper with a di
 
 ## Health Check
 
-`GET /api/health` must return 200. Used by K8s readiness/liveness probes.
+`GET /api/health` returns 200 only when Postgres answers a ping (503 otherwise). Used by the compose healthcheck and the CI smoke test.

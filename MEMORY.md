@@ -36,7 +36,7 @@
 | Auth | golang-jwt + bcrypt, httpOnly cookie, Chi middleware |
 | File Storage | MinIO — minio-go SDK |
 | Doc Parsing | mammoth CLI + pdftotext (poppler-utils) via os/exec |
-| Image | bimg (libvips) — thumbnail → 800×450 webp |
+| Image | vipsthumbnail CLI (vips-tools) via os/exec — webp, max 1600px, q=75 |
 | Backend Infra | **HyperCore NVMe VPS HYPER-2** (HCM 2, Vietnam) — Docker Compose, single VM |
 | Object Storage | **Cloudflare R2** (S3-compatible, 10 GB free, $0 egress) |
 | Frontend Hosting | **Vercel** (free, SSR/SSG, edge network) |
@@ -146,14 +146,14 @@ Upload (multipart/form-data, max 50MB) → Go validates MIME + metadata → temp
   → bluemonday sanitize HTML
   → strip tags → contentPlain (for FTS + auto-description)
   → minio-go: raw/{articleId}.ext (never public)
-  → bimg: thumbnail 800×450 webp → minio-go: thumbs/{articleId}.webp
+  → cover adopted from first gallery image (vipsthumbnail → webp) → minio-go: images/{articleId}/{cuid}.webp
   → sqlc: INSERT article
   → DB trigger → search_vector updated ('simple' dictionary)
   → Status: DRAFT
 ```
 
 ### Article Images & Attachments
-- **Images**: Admin uploads on edit page → bimg optimizes to webp (max 1600px) → MinIO `images/{articleId}/{uuid}.webp` → displayed as gallery
+- **Images**: Admin uploads on edit page → vipsthumbnail optimizes to webp (max 1600px) → MinIO `images/{articleId}/{uuid}.webp` → displayed as gallery
 - **Attachments**: Admin uploads supplementary files (max 20MB each) → MinIO `attachments/{articleId}/{uuid}.{ext}` → displayed as download list
 - MinIO bucket structure: `raw/` | `thumbs/` | `images/` | `attachments/`
 

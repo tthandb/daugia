@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 
 	"github.com/daugia999/backend/internal/db"
@@ -32,160 +31,189 @@ type legacyDoc struct {
 	DocumentURL *string `json:"document_url"`
 }
 
-func migrateLegacy(ctx context.Context, queries *db.Queries, store *storage.Client) {
+var legacyHTTP = &http.Client{Timeout: 2 * time.Minute}
+
+// migrateLegacy imports the old Supabase documents. Each document is
+// all-or-nothing: the raw file is only uploaded once the row has been created,
+// and any per-document failure is counted so the command exits non-zero.
+func migrateLegacy(ctx context.Context, queries *db.Queries, store *storage.Client) error {
 	supabaseURL := mustEnv("LEGACY_SUPABASE_URL")
 	supabaseKey := mustEnv("LEGACY_SUPABASE_ANON_KEY")
 
-	// Fetch all documents from Supabase
 	url := fmt.Sprintf("%s/rest/v1/documents?select=*&order=id", supabaseURL)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("apikey", supabaseKey)
 	req.Header.Set("Authorization", "Bearer "+supabaseKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := legacyHTTP.Do(req)
 	if err != nil {
-		log.Fatalf("failed to fetch documents: %v", err)
+		return fmt.Errorf("fetch documents: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var docs []legacyDoc
 	if err := json.NewDecoder(resp.Body).Decode(&docs); err != nil {
-		log.Fatalf("failed to decode documents: %v", err)
+		return fmt.Errorf("decode documents: %w", err)
 	}
 	fmt.Printf("fetched %d documents from Supabase\n", len(docs))
 
-	// Load categories for mapping
 	cats, err := queries.ListCategories(ctx)
 	if err != nil {
-		log.Fatalf("failed to load categories: %v", err)
+		return fmt.Errorf("load categories: %w", err)
 	}
-	catMap := make(map[string]string) // slug -> id
+	catMap := make(map[string]string)
 	for _, c := range cats {
 		catMap[c.Slug] = c.ID
 	}
 
+	failed := 0
 	for _, doc := range docs {
-		if doc.DocumentURL == nil || *doc.DocumentURL == "" {
-			fmt.Printf("skipping doc %d: no document_url\n", doc.ID)
-			continue
+		if err := importLegacyDoc(ctx, queries, store, catMap, doc); err != nil {
+			failed++
+			log.Printf("doc %d: %v", doc.ID, err)
 		}
-
-		articleID := cuid.New()
-		fmt.Printf("processing doc %d → %s: %s\n", doc.ID, articleID, doc.Title)
-
-		// Download file
-		fileResp, err := http.Get(*doc.DocumentURL)
-		if err != nil {
-			log.Printf("failed to download doc %d: %v", doc.ID, err)
-			continue
-		}
-
-		tmpDir, _ := os.MkdirTemp("", "migrate-*")
-		ext := detectExt(*doc.DocumentURL)
-		tmpFile := filepath.Join(tmpDir, fmt.Sprintf("doc%s", ext))
-
-		f, _ := os.Create(tmpFile)
-		io.Copy(f, fileResp.Body)
-		f.Close()
-		fileResp.Body.Close()
-
-		// Parse content
-		var contentHTML, contentPlain string
-		switch ext {
-		case ".docx":
-			contentHTML, contentPlain, err = parser.ParseDOCX(tmpFile)
-		case ".pdf":
-			contentHTML, contentPlain, err = parser.ParsePDF(tmpFile)
-		default:
-			fmt.Printf("  skipping unsupported format: %s\n", ext)
-			os.RemoveAll(tmpDir)
-			continue
-		}
-		if err != nil {
-			log.Printf("  failed to parse doc %d: %v", doc.ID, err)
-			os.RemoveAll(tmpDir)
-			continue
-		}
-
-		// Generate description
-		description := parser.GenerateDescription(contentPlain, 200)
-		if doc.Description != nil && len(*doc.Description) > 10 {
-			desc := strings.TrimSpace(*doc.Description)
-			// Strip HTML from old descriptions
-			desc = parser.StripHTML(desc)
-			if len(desc) > 10 {
-				description = desc
-			}
-		}
-
-		// Clean slug
-		slug := cleanSlug(doc.Slug, doc.Title)
-
-		// Extract metadata from title
-		province, district, ward := extractLocation(doc.Title)
-		assetType := detectAssetType(doc.Title)
-		plotCount := extractPlotCount(doc.Title)
-		totalArea := extractTotalArea(doc.Title)
-
-		// Detect category
-		categoryID := detectCategory(doc.Title, slug, catMap)
-
-		// Upload raw file to MinIO
-		rawKey := fmt.Sprintf("raw/%s%s", articleID, ext)
-		rawFile, _ := os.Open(tmpFile)
-		stat, _ := rawFile.Stat()
-		mimeType := detectMime(ext)
-		if err := store.Upload(ctx, rawKey, rawFile, stat.Size(), mimeType); err != nil {
-			log.Printf("  failed to upload raw file: %v", err)
-		}
-		rawFile.Close()
-
-		// Parse created_at
-		publishedAt, _ := time.Parse(time.RFC3339, doc.CreatedAt)
-
-		// Get original filename from URL
-		originalFileName := filepath.Base(*doc.DocumentURL)
-
-		// Create article
-		legacyID := pgtype.Int4{Int32: int32(doc.ID), Valid: true}
-		var pgPlotCount pgtype.Int4
-		if plotCount > 0 {
-			pgPlotCount = pgtype.Int4{Int32: int32(plotCount), Valid: true}
-		}
-		_, err = queries.CreateArticle(ctx, db.CreateArticleParams{
-			ID:               articleID,
-			Title:            doc.Title,
-			Slug:             slug,
-			Description:      description,
-			AuthorName:       "Nguyễn Văn Dương",
-			ContentHtml:      contentHTML,
-			ContentPlain:     contentPlain,
-			Status:           "PUBLISHED",
-			Province:         nilIfEmpty(province),
-			District:         nilIfEmpty(district),
-			Ward:             nilIfEmpty(ward),
-			AssetType:        nilIfEmpty(assetType),
-			PlotCount:        pgPlotCount,
-			TotalArea:        nilIfEmpty(totalArea),
-			ThumbnailKey:     nil,
-			OriginalFileKey:  &rawKey,
-			OriginalFileName: &originalFileName,
-			OriginalFileMime: &mimeType,
-			LegacyID:         legacyID,
-			LegacyFileKey:    doc.DocumentURL,
-			CategoryID:       nilIfEmpty(categoryID),
-			PublishedAt:      &publishedAt,
-		})
-		if err != nil {
-			log.Printf("  failed to create article %d: %v", doc.ID, err)
-		} else {
-			fmt.Printf("  created article: %s\n", slug)
-		}
-
-		os.RemoveAll(tmpDir)
 	}
 
-	fmt.Println("legacy migration complete")
+	fmt.Printf("legacy migration complete: %d documents, %d failed\n", len(docs), failed)
+	if failed > 0 {
+		return fmt.Errorf("%d documents failed to import", failed)
+	}
+	return nil
+}
+
+func importLegacyDoc(ctx context.Context, queries *db.Queries, store *storage.Client, catMap map[string]string, doc legacyDoc) error {
+	if doc.DocumentURL == nil || *doc.DocumentURL == "" {
+		fmt.Printf("skipping doc %d: no document_url\n", doc.ID)
+		return nil
+	}
+	ext := detectExt(*doc.DocumentURL)
+	if ext != ".docx" && ext != ".pdf" {
+		fmt.Printf("skipping doc %d: unsupported format %s\n", doc.ID, ext)
+		return nil
+	}
+
+	articleID := cuid.New()
+	fmt.Printf("processing doc %d → %s: %s\n", doc.ID, articleID, doc.Title)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, *doc.DocumentURL, nil)
+	if err != nil {
+		return err
+	}
+	fileResp, err := legacyHTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("download: %w", err)
+	}
+	defer fileResp.Body.Close()
+	if fileResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download: HTTP %d", fileResp.StatusCode)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "migrate-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+	tmpFile := filepath.Join(tmpDir, "doc"+ext)
+	f, err := os.Create(tmpFile)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, fileResp.Body); err != nil {
+		f.Close()
+		return fmt.Errorf("save download: %w", err)
+	}
+	f.Close()
+
+	var contentHTML, contentPlain string
+	switch ext {
+	case ".docx":
+		contentHTML, contentPlain, err = parser.ParseDOCX(ctx, tmpFile)
+	case ".pdf":
+		contentHTML, contentPlain, err = parser.ParsePDF(ctx, tmpFile)
+	}
+	if err != nil {
+		return fmt.Errorf("parse: %w", err)
+	}
+
+	description := parser.GenerateDescription(contentPlain, 200)
+	if doc.Description != nil && len(*doc.Description) > 10 {
+		desc := parser.StripHTML(strings.TrimSpace(*doc.Description))
+		if len(desc) > 10 {
+			description = desc
+		}
+	}
+
+	slug := cleanSlug(doc.Slug, doc.Title)
+	province, district, ward := extractLocation(doc.Title)
+	assetType := detectAssetType(doc.Title)
+	plotCount := extractPlotCount(doc.Title)
+	totalArea := extractTotalArea(doc.Title)
+	categoryID := detectCategory(doc.Title, slug, catMap)
+
+	rawKey := fmt.Sprintf("raw/%s%s", articleID, ext)
+	mimeType := detectMime(ext)
+	publishedAt, _ := time.Parse(time.RFC3339, doc.CreatedAt)
+	originalFileName := filepath.Base(*doc.DocumentURL)
+
+	if doc.ID > int(^uint32(0)>>1) {
+		return fmt.Errorf("legacy id %d overflows int32", doc.ID)
+	}
+	legacyID := int32(doc.ID)
+	var pgPlotCount *int32
+	if plotCount > 0 {
+		v := int32(plotCount)
+		pgPlotCount = &v
+	}
+	if _, err := queries.CreateArticle(ctx, db.CreateArticleParams{
+		ID:               articleID,
+		Title:            doc.Title,
+		Slug:             slug,
+		Description:      description,
+		AuthorName:       "Nguyễn Văn Dương",
+		ContentHtml:      contentHTML,
+		ContentPlain:     contentPlain,
+		Status:           "PUBLISHED",
+		Province:         nilIfEmpty(province),
+		District:         nilIfEmpty(district),
+		Ward:             nilIfEmpty(ward),
+		AssetType:        nilIfEmpty(assetType),
+		PlotCount:        pgPlotCount,
+		TotalArea:        nilIfEmpty(totalArea),
+		OriginalFileKey:  &rawKey,
+		OriginalFileName: &originalFileName,
+		OriginalFileMime: &mimeType,
+		LegacyID:         &legacyID,
+		LegacyFileKey:    doc.DocumentURL,
+		CategoryID:       nilIfEmpty(categoryID),
+		PublishedAt:      &publishedAt,
+	}); err != nil {
+		return fmt.Errorf("create article: %w", err)
+	}
+
+	if err := uploadFile(ctx, store, rawKey, tmpFile, mimeType); err != nil {
+		if _, delErr := queries.DeleteArticle(ctx, articleID); delErr != nil {
+			log.Printf("  roll back article %s: %v", articleID, delErr)
+		}
+		return fmt.Errorf("upload raw file: %w", err)
+	}
+	fmt.Printf("  created article: %s\n", slug)
+	return nil
+}
+
+func uploadFile(ctx context.Context, store *storage.Client, key, path, mimeType string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	stat, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	return store.Upload(ctx, key, f, stat.Size(), mimeType)
 }
 
 // --- Helper functions ---
@@ -253,15 +281,15 @@ func extractLocation(title string) (province, district, ward string) {
 
 	// District detection
 	districts := map[string]string{
-		"vĩnh tường":  "Vĩnh Tường",
-		"lập thạch":   "Lập Thạch",
-		"tam dương":   "Tam Dương",
-		"yên lạc":     "Yên Lạc",
-		"bình xuyên":  "Bình Xuyên",
-		"vĩnh yên":    "Vĩnh Yên",
-		"phúc yên":    "Phúc Yên",
-		"sông lô":     "Sông Lô",
-		"tam đảo":     "Tam Đảo",
+		"vĩnh tường": "Vĩnh Tường",
+		"lập thạch":  "Lập Thạch",
+		"tam dương":  "Tam Dương",
+		"yên lạc":    "Yên Lạc",
+		"bình xuyên": "Bình Xuyên",
+		"vĩnh yên":   "Vĩnh Yên",
+		"phúc yên":   "Phúc Yên",
+		"sông lô":    "Sông Lô",
+		"tam đảo":    "Tam Đảo",
 	}
 	for key, val := range districts {
 		if strings.Contains(titleLower, key) {
@@ -349,4 +377,3 @@ func nilIfEmpty(s string) *string {
 	}
 	return &s
 }
-

@@ -2,212 +2,207 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/daugia999/backend/internal/auth"
 	"github.com/daugia999/backend/internal/db"
 	"github.com/daugia999/backend/internal/handler"
 	"github.com/daugia999/backend/internal/storage"
 )
 
+const (
+	startupTimeout  = 15 * time.Second
+	shutdownTimeout = 15 * time.Second
+	minJWTSecretLen = 32
+)
+
+var placeholderSecrets = map[string]bool{
+	"your-secret-key-change-this": true,
+	"changeme":                    true,
+	"secret":                      true,
+}
+
 func main() {
-	// Subcommands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "seed":
-			runSeed()
+			exitOn(runSeed())
 			return
 		case "migrate":
-			runMigrate()
-			return
+			fmt.Fprintln(os.Stderr, "migrations are applied with golang-migrate:\n  migrate -path migrations -database \"$DATABASE_URL\" up")
+			os.Exit(2)
 		case "migrate-legacy":
-			runMigrateLegacy()
+			exitOn(runMigrateLegacy())
 			return
 		case "migrate-local":
-			runMigrateLocal()
+			exitOn(runMigrateLocal())
 			return
 		case "reoptimize-thumbs":
-			runReoptimizeThumbs()
+			exitOn(runReoptimizeThumbs())
 			return
 		}
 	}
+	exitOn(runServer())
+}
 
-	// Config from env
+func exitOn(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runServer() error {
 	port := envOr("PORT", "8080")
-	databaseURL := mustEnv("DATABASE_URL")
-	jwtSecret := []byte(mustEnv("JWT_SECRET"))
-	minioEndpoint := mustEnv("MINIO_ENDPOINT")
-	minioAccessKey := mustEnv("MINIO_ACCESS_KEY")
-	minioSecretKey := mustEnv("MINIO_SECRET_KEY")
-	minioBucket := envOr("MINIO_BUCKET", "articles")
-	minioSSL := envOr("MINIO_USE_SSL", "false") == "true"
+	jwtSecret := mustEnv("JWT_SECRET")
+	if err := validateJWTSecret(jwtSecret); err != nil {
+		return err
+	}
 	corsOrigin := envOr("CORS_ORIGIN", "http://localhost:3000")
 	secureCookie := envOr("SECURE_COOKIE", "false") == "true"
 
-	// Database
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
+	pool, err := openPool(ctx)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		cancel()
+		return err
 	}
 	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
-	}
-	log.Println("connected to database")
-
-	queries := db.New(pool)
-
-	// MinIO
-	store, err := storage.New(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioSSL)
+	store, err := openStore(ctx)
+	cancel()
 	if err != nil {
-		log.Fatalf("failed to connect to minio: %v", err)
+		return err
 	}
-	log.Println("connected to minio")
 
-	// Handlers
-	h := handler.New(queries, pool, store, jwtSecret, secureCookie)
+	h := handler.New(db.New(pool), pool, store, []byte(jwtSecret), secureCookie)
 
-	// Router
 	r := chi.NewRouter()
-
-	// Middleware
-	r.Use(chimw.Logger)
-	r.Use(chimw.Recoverer)
-	r.Use(chimw.RealIP)
+	// Order matters: the request id and client ip must be resolved before the
+	// logger reads them, and the recoverer must wrap everything below it.
 	r.Use(chimw.RequestID)
+	r.Use(handler.TrustedRealIP)
+	r.Use(quietHealthLogger)
+	r.Use(chimw.Recoverer)
 	r.Use(chimw.Compress(5))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{corsOrigin},
-		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	handler.RegisterRoutes(r, h)
 
-	// Public routes
-	r.Route("/api", func(r chi.Router) {
-		r.Get("/health", h.Health)
-
-		// Articles
-		r.Get("/articles", h.ListArticles)
-		r.Get("/articles/featured", h.FeaturedArticles)
-		r.Get("/articles/{slug}", h.GetArticle)
-		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(30, time.Minute))
-			r.Post("/articles/{id}/view", h.TrackView)
-		})
-
-		// Categories & tags
-		r.Get("/categories", h.ListCategories)
-		r.Get("/tags", h.ListTags)
-
-		// Search
-		r.Get("/search", h.SearchArticles)
-
-		// File proxies. HEAD shares the GET handler so monitoring tools and
-		// CDN preflights stop seeing 405.
-		r.Get("/thumbs/{id}", h.ProxyThumbnail)
-		r.Head("/thumbs/{id}", h.ProxyThumbnail)
-		r.Get("/images/{id}", h.ProxyImage)
-		r.Head("/images/{id}", h.ProxyImage)
-		r.Get("/articles/{id}/attachments/{attachmentId}", h.DownloadAttachment)
-		r.Get("/articles/{slug}/download", h.DownloadArticle)
-
-		// Sitemap data
-		r.Get("/sitemap", h.SitemapData)
-
-		// Auth. Rate-limit login (bcrypt is ~60-100ms of CPU per attempt against a
-		// single known admin email) to blunt brute force and cheap CPU-exhaustion.
-		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(5, time.Minute))
-			r.Post("/auth/login", h.Login)
-		})
-		r.Post("/auth/logout", h.Logout)
-		r.Get("/auth/me", h.Me)
-
-		// Admin routes (JWT required)
-		r.Route("/admin", func(r chi.Router) {
-			r.Use(auth.RequireAdmin(jwtSecret))
-
-			r.Get("/stats", h.AdminStats)
-
-			// Articles CRUD
-			r.Get("/articles", h.AdminListArticles)
-			r.Post("/articles", h.AdminCreateArticle)
-			r.Get("/articles/{id}", h.AdminGetArticle)
-			r.Patch("/articles/{id}", h.AdminUpdateArticle)
-			r.Delete("/articles/{id}", h.AdminDeleteArticle)
-			r.Post("/articles/{id}/publish", h.AdminPublishArticle)
-			r.Post("/articles/{id}/unpublish", h.AdminUnpublishArticle)
-			r.Post("/articles/{id}/archive", h.AdminArchiveArticle)
-
-			// Article images
-			r.Post("/articles/{id}/images", h.AdminUploadImages)
-			r.Patch("/articles/{id}/images/{imageId}", h.AdminUpdateImage)
-			r.Delete("/articles/{id}/images/{imageId}", h.AdminDeleteImage)
-			r.Patch("/articles/{id}/images/reorder", h.AdminReorderImages)
-
-			// Article attachments
-			r.Post("/articles/{id}/attachments", h.AdminUploadAttachment)
-			r.Patch("/articles/{id}/attachments/{attachmentId}", h.AdminUpdateAttachment)
-			r.Delete("/articles/{id}/attachments/{attachmentId}", h.AdminDeleteAttachment)
-
-			// Categories CRUD
-			r.Post("/categories", h.AdminCreateCategory)
-			r.Patch("/categories/{id}", h.AdminUpdateCategory)
-			r.Delete("/categories/{id}", h.AdminDeleteCategory)
-
-			// Tags CRUD
-			r.Post("/tags", h.AdminCreateTag)
-			r.Delete("/tags/{id}", h.AdminDeleteTag)
-
-			// Raw file (admin only presigned URL)
-			r.Get("/articles/{id}/raw", h.AdminRawFileURL)
-		})
-	})
-
-	// Server
 	srv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      r,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       2 * time.Minute,
+		WriteTimeout:      3 * time.Minute,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
 	}
 
-	// Graceful shutdown
+	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("server listening on :%s", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("shutting down server...")
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("server: %w", err)
+	case sig := <-quit:
+		log.Printf("received %s, shutting down", sig)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("server forced to shutdown: %v", err)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancelShutdown()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("forced shutdown: %v", err)
 	}
 	log.Println("server stopped")
+	return nil
+}
+
+// quietHealthLogger is chi's request logger minus the healthcheck noise.
+func quietHealthLogger(next http.Handler) http.Handler {
+	logged := chimw.Logger(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		logged.ServeHTTP(w, r)
+	})
+}
+
+func validateJWTSecret(secret string) error {
+	if len(secret) < minJWTSecretLen {
+		return fmt.Errorf("JWT_SECRET must be at least %d characters", minJWTSecretLen)
+	}
+	if placeholderSecrets[strings.ToLower(secret)] {
+		return errors.New("JWT_SECRET is a placeholder value; generate a random secret")
+	}
+	return nil
+}
+
+func openPool(ctx context.Context) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(mustEnv("DATABASE_URL"))
+	if err != nil {
+		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+	}
+	cfg.MaxConns = 10
+	cfg.MinConns = 1
+	cfg.MaxConnLifetime = time.Hour
+	cfg.MaxConnIdleTime = 10 * time.Minute
+	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
+	if cfg.ConnConfig.RuntimeParams == nil {
+		cfg.ConnConfig.RuntimeParams = map[string]string{}
+	}
+	cfg.ConnConfig.RuntimeParams["statement_timeout"] = "30000"
+	cfg.ConnConfig.RuntimeParams["application_name"] = "daugia-api"
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+	log.Println("connected to database")
+	return pool, nil
+}
+
+func openStore(ctx context.Context) (*storage.Client, error) {
+	store, err := storage.New(ctx,
+		mustEnv("MINIO_ENDPOINT"),
+		mustEnv("MINIO_ACCESS_KEY"),
+		mustEnv("MINIO_SECRET_KEY"),
+		envOr("MINIO_BUCKET", "articles"),
+		envOr("MINIO_USE_SSL", "false") == "true",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("connect to object storage: %w", err)
+	}
+	log.Println("connected to object storage")
+	return store, nil
 }
 
 func mustEnv(key string) string {
@@ -225,76 +220,48 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// Placeholder functions for subcommands — delegated to separate files
-func runSeed() {
-	fmt.Println("Running seed...")
-	databaseURL := mustEnv("DATABASE_URL")
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+func runSeed() error {
+	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
+	defer cancel()
+	pool, err := openPool(ctx)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		return err
 	}
 	defer pool.Close()
-
-	queries := db.New(pool)
-	seedDB(ctx, queries)
+	return seedDB(ctx, db.New(pool))
 }
 
-func runMigrate() {
-	fmt.Println("Running migrations...")
-	// golang-migrate handles this via CLI:
-	// migrate -path migrations -database "$DATABASE_URL" up
-	fmt.Println("Use: migrate -path migrations -database \"$DATABASE_URL\" up")
-}
-
-func runMigrateLegacy() {
-	fmt.Println("Running legacy migration...")
-	databaseURL := mustEnv("DATABASE_URL")
-	minioEndpoint := mustEnv("MINIO_ENDPOINT")
-	minioAccessKey := mustEnv("MINIO_ACCESS_KEY")
-	minioSecretKey := mustEnv("MINIO_SECRET_KEY")
-	minioBucket := envOr("MINIO_BUCKET", "articles")
-	minioSSL := envOr("MINIO_USE_SSL", "false") == "true"
-
+func runMigrateLegacy() error {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, store, err := openDeps(ctx)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		return err
 	}
 	defer pool.Close()
-
-	queries := db.New(pool)
-
-	store, err := storage.New(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioSSL)
-	if err != nil {
-		log.Fatalf("failed to connect to minio: %v", err)
-	}
-
-	migrateLegacy(ctx, queries, store)
+	return migrateLegacy(ctx, db.New(pool), store)
 }
 
-func runMigrateLocal() {
-	fmt.Println("Running local migration...")
-	databaseURL := mustEnv("DATABASE_URL")
-	minioEndpoint := mustEnv("MINIO_ENDPOINT")
-	minioAccessKey := mustEnv("MINIO_ACCESS_KEY")
-	minioSecretKey := mustEnv("MINIO_SECRET_KEY")
-	minioBucket := envOr("MINIO_BUCKET", "articles")
-	minioSSL := envOr("MINIO_USE_SSL", "false") == "true"
-
+func runMigrateLocal() error {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, databaseURL)
+	pool, store, err := openDeps(ctx)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		return err
 	}
 	defer pool.Close()
+	return migrateLocal(ctx, db.New(pool), store)
+}
 
-	queries := db.New(pool)
-
-	store, err := storage.New(minioEndpoint, minioAccessKey, minioSecretKey, minioBucket, minioSSL)
+func openDeps(ctx context.Context) (*pgxpool.Pool, *storage.Client, error) {
+	startCtx, cancel := context.WithTimeout(ctx, startupTimeout)
+	defer cancel()
+	pool, err := openPool(startCtx)
 	if err != nil {
-		log.Fatalf("failed to connect to minio: %v", err)
+		return nil, nil, err
 	}
-
-	migrateLocal(ctx, queries, store)
+	store, err := openStore(startCtx)
+	if err != nil {
+		pool.Close()
+		return nil, nil, err
+	}
+	return pool, store, nil
 }

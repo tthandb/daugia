@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const createArticleAttachment = `-- name: CreateArticleAttachment :one
@@ -96,34 +97,65 @@ func (q *Queries) CreateArticleImage(ctx context.Context, arg CreateArticleImage
 }
 
 const deleteArticleAttachment = `-- name: DeleteArticleAttachment :one
-DELETE FROM article_attachments WHERE id = $1 RETURNING file_key
+DELETE FROM article_attachments WHERE id = $1 AND article_id = $2 RETURNING file_key
 `
 
-func (q *Queries) DeleteArticleAttachment(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRow(ctx, deleteArticleAttachment, id)
+type DeleteArticleAttachmentParams struct {
+	ID        string `json:"id"`
+	ArticleID string `json:"article_id"`
+}
+
+func (q *Queries) DeleteArticleAttachment(ctx context.Context, arg DeleteArticleAttachmentParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteArticleAttachment, arg.ID, arg.ArticleID)
 	var file_key string
 	err := row.Scan(&file_key)
 	return file_key, err
 }
 
 const deleteArticleImage = `-- name: DeleteArticleImage :one
-DELETE FROM article_images WHERE id = $1 RETURNING file_key
+DELETE FROM article_images WHERE id = $1 AND article_id = $2 RETURNING file_key
 `
 
-func (q *Queries) DeleteArticleImage(ctx context.Context, id string) (string, error) {
-	row := q.db.QueryRow(ctx, deleteArticleImage, id)
+type DeleteArticleImageParams struct {
+	ID        string `json:"id"`
+	ArticleID string `json:"article_id"`
+}
+
+func (q *Queries) DeleteArticleImage(ctx context.Context, arg DeleteArticleImageParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteArticleImage, arg.ID, arg.ArticleID)
 	var file_key string
 	err := row.Scan(&file_key)
 	return file_key, err
 }
 
 const getArticleAttachment = `-- name: GetArticleAttachment :one
-SELECT id, article_id, file_key, file_name, file_mime, size_bytes, sort_order, created_at FROM article_attachments WHERE id = $1
+SELECT at.id, at.article_id, at.file_key, at.file_name, at.file_mime, at.size_bytes,
+       at.sort_order, at.created_at, a.status AS article_status
+FROM article_attachments at
+JOIN articles a ON a.id = at.article_id
+WHERE at.id = $1 AND at.article_id = $2
 `
 
-func (q *Queries) GetArticleAttachment(ctx context.Context, id string) (ArticleAttachment, error) {
-	row := q.db.QueryRow(ctx, getArticleAttachment, id)
-	var i ArticleAttachment
+type GetArticleAttachmentParams struct {
+	ID        string `json:"id"`
+	ArticleID string `json:"article_id"`
+}
+
+type GetArticleAttachmentRow struct {
+	ID            string    `json:"id"`
+	ArticleID     string    `json:"article_id"`
+	FileKey       string    `json:"file_key"`
+	FileName      string    `json:"file_name"`
+	FileMime      string    `json:"file_mime"`
+	SizeBytes     int32     `json:"size_bytes"`
+	SortOrder     int32     `json:"sort_order"`
+	CreatedAt     time.Time `json:"created_at"`
+	ArticleStatus string    `json:"article_status"`
+}
+
+func (q *Queries) GetArticleAttachment(ctx context.Context, arg GetArticleAttachmentParams) (GetArticleAttachmentRow, error) {
+	row := q.db.QueryRow(ctx, getArticleAttachment, arg.ID, arg.ArticleID)
+	var i GetArticleAttachmentRow
 	err := row.Scan(
 		&i.ID,
 		&i.ArticleID,
@@ -133,17 +165,36 @@ func (q *Queries) GetArticleAttachment(ctx context.Context, id string) (ArticleA
 		&i.SizeBytes,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.ArticleStatus,
 	)
 	return i, err
 }
 
 const getArticleImage = `-- name: GetArticleImage :one
-SELECT id, article_id, file_key, file_name, alt_text, width, height, size_bytes, sort_order, created_at FROM article_images WHERE id = $1
+SELECT i.id, i.article_id, i.file_key, i.file_name, i.alt_text, i.width, i.height,
+       i.size_bytes, i.sort_order, i.created_at, a.status AS article_status
+FROM article_images i
+JOIN articles a ON a.id = i.article_id
+WHERE i.id = $1
 `
 
-func (q *Queries) GetArticleImage(ctx context.Context, id string) (ArticleImage, error) {
+type GetArticleImageRow struct {
+	ID            string    `json:"id"`
+	ArticleID     string    `json:"article_id"`
+	FileKey       string    `json:"file_key"`
+	FileName      string    `json:"file_name"`
+	AltText       string    `json:"alt_text"`
+	Width         int32     `json:"width"`
+	Height        int32     `json:"height"`
+	SizeBytes     int32     `json:"size_bytes"`
+	SortOrder     int32     `json:"sort_order"`
+	CreatedAt     time.Time `json:"created_at"`
+	ArticleStatus string    `json:"article_status"`
+}
+
+func (q *Queries) GetArticleImage(ctx context.Context, id string) (GetArticleImageRow, error) {
 	row := q.db.QueryRow(ctx, getArticleImage, id)
-	var i ArticleImage
+	var i GetArticleImageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ArticleID,
@@ -155,12 +206,13 @@ func (q *Queries) GetArticleImage(ctx context.Context, id string) (ArticleImage,
 		&i.SizeBytes,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.ArticleStatus,
 	)
 	return i, err
 }
 
 const listArticleAttachments = `-- name: ListArticleAttachments :many
-SELECT id, article_id, file_key, file_name, file_mime, size_bytes, sort_order, created_at FROM article_attachments WHERE article_id = $1 ORDER BY sort_order
+SELECT id, article_id, file_key, file_name, file_mime, size_bytes, sort_order, created_at FROM article_attachments WHERE article_id = $1 ORDER BY sort_order, created_at
 `
 
 func (q *Queries) ListArticleAttachments(ctx context.Context, articleID string) ([]ArticleAttachment, error) {
@@ -193,7 +245,7 @@ func (q *Queries) ListArticleAttachments(ctx context.Context, articleID string) 
 }
 
 const listArticleImages = `-- name: ListArticleImages :many
-SELECT id, article_id, file_key, file_name, alt_text, width, height, size_bytes, sort_order, created_at FROM article_images WHERE article_id = $1 ORDER BY sort_order
+SELECT id, article_id, file_key, file_name, alt_text, width, height, size_bytes, sort_order, created_at FROM article_images WHERE article_id = $1 ORDER BY sort_order, created_at
 `
 
 func (q *Queries) ListArticleImages(ctx context.Context, articleID string) ([]ArticleImage, error) {
@@ -227,58 +279,56 @@ func (q *Queries) ListArticleImages(ctx context.Context, articleID string) ([]Ar
 	return items, nil
 }
 
-const updateArticleAttachmentName = `-- name: UpdateArticleAttachmentName :exec
-UPDATE article_attachments SET file_name = $2 WHERE id = $1
+const updateArticleAttachmentName = `-- name: UpdateArticleAttachmentName :execrows
+UPDATE article_attachments SET file_name = $3 WHERE id = $1 AND article_id = $2
 `
 
 type UpdateArticleAttachmentNameParams struct {
-	ID       string `json:"id"`
-	FileName string `json:"file_name"`
-}
-
-func (q *Queries) UpdateArticleAttachmentName(ctx context.Context, arg UpdateArticleAttachmentNameParams) error {
-	_, err := q.db.Exec(ctx, updateArticleAttachmentName, arg.ID, arg.FileName)
-	return err
-}
-
-const updateArticleAttachmentOrder = `-- name: UpdateArticleAttachmentOrder :exec
-UPDATE article_attachments SET sort_order = $2 WHERE id = $1
-`
-
-type UpdateArticleAttachmentOrderParams struct {
 	ID        string `json:"id"`
-	SortOrder int32  `json:"sort_order"`
+	ArticleID string `json:"article_id"`
+	FileName  string `json:"file_name"`
 }
 
-func (q *Queries) UpdateArticleAttachmentOrder(ctx context.Context, arg UpdateArticleAttachmentOrderParams) error {
-	_, err := q.db.Exec(ctx, updateArticleAttachmentOrder, arg.ID, arg.SortOrder)
-	return err
+func (q *Queries) UpdateArticleAttachmentName(ctx context.Context, arg UpdateArticleAttachmentNameParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateArticleAttachmentName, arg.ID, arg.ArticleID, arg.FileName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const updateArticleImageAlt = `-- name: UpdateArticleImageAlt :exec
-UPDATE article_images SET alt_text = $2 WHERE id = $1
+const updateArticleImageAlt = `-- name: UpdateArticleImageAlt :execrows
+UPDATE article_images SET alt_text = $3 WHERE id = $1 AND article_id = $2
 `
 
 type UpdateArticleImageAltParams struct {
-	ID      string `json:"id"`
-	AltText string `json:"alt_text"`
+	ID        string `json:"id"`
+	ArticleID string `json:"article_id"`
+	AltText   string `json:"alt_text"`
 }
 
-func (q *Queries) UpdateArticleImageAlt(ctx context.Context, arg UpdateArticleImageAltParams) error {
-	_, err := q.db.Exec(ctx, updateArticleImageAlt, arg.ID, arg.AltText)
-	return err
+func (q *Queries) UpdateArticleImageAlt(ctx context.Context, arg UpdateArticleImageAltParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateArticleImageAlt, arg.ID, arg.ArticleID, arg.AltText)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const updateArticleImageOrder = `-- name: UpdateArticleImageOrder :exec
-UPDATE article_images SET sort_order = $2 WHERE id = $1
+const updateArticleImageOrder = `-- name: UpdateArticleImageOrder :execrows
+UPDATE article_images SET sort_order = $3 WHERE id = $1 AND article_id = $2
 `
 
 type UpdateArticleImageOrderParams struct {
 	ID        string `json:"id"`
+	ArticleID string `json:"article_id"`
 	SortOrder int32  `json:"sort_order"`
 }
 
-func (q *Queries) UpdateArticleImageOrder(ctx context.Context, arg UpdateArticleImageOrderParams) error {
-	_, err := q.db.Exec(ctx, updateArticleImageOrder, arg.ID, arg.SortOrder)
-	return err
+func (q *Queries) UpdateArticleImageOrder(ctx context.Context, arg UpdateArticleImageOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateArticleImageOrder, arg.ID, arg.ArticleID, arg.SortOrder)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

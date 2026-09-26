@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"fmt"
-	"os/exec"
+	"context"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -40,14 +39,10 @@ var stripPolicy = bluemonday.StrictPolicy()
 
 // ParseDOCX converts a DOCX file to sanitized HTML and plain text using the
 // mammoth CLI tool. The mammoth command writes HTML to stdout.
-func ParseDOCX(filePath string) (html string, plain string, err error) {
-	cmd := exec.Command("mammoth", filePath)
-	out, err := cmd.Output()
+func ParseDOCX(ctx context.Context, filePath string) (html string, plain string, err error) {
+	out, err := runTool(ctx, "mammoth", filePath)
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", "", fmt.Errorf("mammoth failed: %s", string(exitErr.Stderr))
-		}
-		return "", "", fmt.Errorf("mammoth exec: %w", err)
+		return "", "", err
 	}
 
 	raw := string(out)
@@ -61,14 +56,10 @@ func ParseDOCX(filePath string) (html string, plain string, err error) {
 // ParsePDF converts a PDF file to HTML-wrapped paragraphs and plain text using
 // pdftotext (poppler-utils). The -layout flag preserves the original layout,
 // and "-" sends output to stdout.
-func ParsePDF(filePath string) (html string, plain string, err error) {
-	cmd := exec.Command("pdftotext", "-layout", filePath, "-")
-	out, err := cmd.Output()
+func ParsePDF(ctx context.Context, filePath string) (html string, plain string, err error) {
+	out, err := runTool(ctx, "pdftotext", "-layout", filePath, "-")
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", "", fmt.Errorf("pdftotext failed: %s", string(exitErr.Stderr))
-		}
-		return "", "", fmt.Errorf("pdftotext exec: %w", err)
+		return "", "", err
 	}
 
 	plain = strings.TrimSpace(string(out))
@@ -97,17 +88,6 @@ func StripHTML(html string) string {
 // multiSpaceRe collapses multiple whitespace into a single space
 var multiSpaceRe = regexp.MustCompile(`\s{2,}`)
 
-// headerRe matches the entire document header block up to the actual content.
-// Captures everything from "CÔNG TY" through "THÔNG BÁO ĐẤU GIÁ..." heading.
-var headerRe = regexp.MustCompile(
-	`(?s)CÔNG TY ĐẤU GIÁ.*?(?:THÔNG BÁO[^.]{0,80}?)(?:\d+\.\s)`,
-)
-
-// altHeaderRe for documents that start with "CỘNG HÒA"
-var altHeaderRe = regexp.MustCompile(
-	`(?s)CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM.*?(?:THÔNG BÁO|QUY CHẾ)[^.]{0,80}?(?:\d+\.\s|[-–]\s*Căn cứ)`,
-)
-
 // docNumberRe matches standalone doc numbers like "Số: 23/TB –ĐGTS"
 var docNumberRe = regexp.MustCompile(`Số\s*:\s*[\d.]+[/\s]*[A-ZĐ\-–\s]+`)
 
@@ -133,6 +113,9 @@ func GenerateDescription(plainText string, maxLen int) string {
 
 	return strings.TrimSpace(truncated) + "…"
 }
+
+// allCapsRe removes headings like "THÔNG BÁO ĐẤU GIÁ TÀI SẢN THI HÀNH ÁN".
+var allCapsRe = regexp.MustCompile(`[A-ZÀ-Ỹ][A-ZÀ-Ỹ\s]{5,}`)
 
 // contentStartRe finds the first real content — typically starts with a phrase like:
 // "Cơ quan có tài sản", "Đơn vị có tài sản", "Căn cứ", "1. Đơn vị", "1. Cơ quan"
@@ -167,8 +150,6 @@ func cleanBoilerplate(text string) string {
 		text = docNumberRe.ReplaceAllString(text, "")
 		text = datePrefixRe.ReplaceAllString(text, "")
 
-		// Remove all-caps phrases (headings like "THÔNG BÁO ĐẤU GIÁ TÀI SẢN THI HÀNH ÁN")
-		allCapsRe := regexp.MustCompile(`[A-ZÀ-Ỹ][A-ZÀ-Ỹ\s]{5,}`)
 		text = allCapsRe.ReplaceAllString(text, " ")
 	}
 

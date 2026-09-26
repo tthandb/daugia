@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/lucsky/cuid"
@@ -12,68 +12,56 @@ import (
 	"github.com/daugia999/backend/internal/db"
 )
 
-func seedDB(ctx context.Context, queries *db.Queries) {
-	// Seed admin user. Require credentials from the environment — never fall back
-	// to a hardcoded default, which would create a publicly-known admin account.
+// seedDB creates the admin user and the default categories. It is idempotent:
+// an existing admin is left alone and categories the admin has renamed or
+// re-ordered are never overwritten.
+func seedDB(ctx context.Context, queries *db.Queries) error {
 	email := os.Getenv("ADMIN_EMAIL")
 	password := os.Getenv("ADMIN_PASSWORD")
 	if email == "" || password == "" {
-		log.Fatal("ADMIN_EMAIL and ADMIN_PASSWORD must be set to seed the admin user")
+		return errors.New("ADMIN_EMAIL and ADMIN_PASSWORD must be set to seed the admin user")
+	}
+	if len(password) < 12 {
+		return errors.New("ADMIN_PASSWORD must be at least 12 characters")
 	}
 
 	exists, err := queries.UserExists(ctx, email)
 	if err != nil {
-		log.Fatalf("failed to check user: %v", err)
+		return fmt.Errorf("check user: %w", err)
 	}
-
 	if !exists {
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			log.Fatalf("failed to hash password: %v", err)
+			return fmt.Errorf("hash password: %w", err)
 		}
-		_, err = queries.CreateUser(ctx, db.CreateUserParams{
+		if _, err := queries.CreateUser(ctx, db.CreateUserParams{
 			ID:           cuid.New(),
 			Email:        email,
 			PasswordHash: string(hash),
 			Name:         "Nguyễn Văn Dương",
 			Role:         "ADMIN",
-		})
-		if err != nil {
-			log.Fatalf("failed to create admin: %v", err)
+		}); err != nil {
+			return fmt.Errorf("create admin: %w", err)
 		}
 		fmt.Printf("admin user created: %s\n", email)
 	} else {
 		fmt.Println("admin user already exists")
 	}
 
-	// Seed categories
-	categories := []struct {
-		Name      string
-		Slug      string
-		Color     string
-		SortOrder int32
-	}{
-		{"Đấu Giá QSD Đất", "dau-gia-qsd-dat", "#A16207", 1},
-		{"Tài Sản Thi Hành Án", "tai-san-thi-hanh-an", "#B45309", 2},
-		{"Tài Sản Thanh Lý", "tai-san-thanh-ly", "#78350F", 3},
-		{"Đấu Giá Phương Tiện", "dau-gia-phuong-tien", "#44403C", 4},
-		{"Khác", "khac", "#57534E", 5},
+	categories := []db.InsertCategoryIfMissingParams{
+		{Name: "Đấu Giá QSD Đất", Slug: "dau-gia-qsd-dat", Color: "#A16207", SortOrder: 1},
+		{Name: "Tài Sản Thi Hành Án", Slug: "tai-san-thi-hanh-an", Color: "#B45309", SortOrder: 2},
+		{Name: "Tài Sản Thanh Lý", Slug: "tai-san-thanh-ly", Color: "#78350F", SortOrder: 3},
+		{Name: "Đấu Giá Phương Tiện", Slug: "dau-gia-phuong-tien", Color: "#44403C", SortOrder: 4},
+		{Name: "Khác", Slug: "khac", Color: "#57534E", SortOrder: 5},
 	}
-
 	for _, cat := range categories {
-		_, err := queries.UpsertCategory(ctx, db.UpsertCategoryParams{
-			ID:        cuid.New(),
-			Name:      cat.Name,
-			Slug:      cat.Slug,
-			Color:     cat.Color,
-			SortOrder: cat.SortOrder,
-		})
-		if err != nil {
-			log.Printf("failed to upsert category %s: %v", cat.Name, err)
-		} else {
-			fmt.Printf("category: %s\n", cat.Name)
+		cat.ID = cuid.New()
+		if err := queries.InsertCategoryIfMissing(ctx, cat); err != nil {
+			return fmt.Errorf("seed category %s: %w", cat.Slug, err)
 		}
 	}
 
 	fmt.Println("seed complete")
+	return nil
 }

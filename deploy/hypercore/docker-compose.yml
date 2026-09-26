@@ -11,6 +11,8 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+    shm_size: 256m
+    mem_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -35,7 +37,7 @@ services:
         condition: service_healthy
     environment:
       PORT: "8080"
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable&connect_timeout=5
       JWT_SECRET: ${JWT_SECRET}
 
       # Cloudflare R2 (S3-compatible)
@@ -47,13 +49,22 @@ services:
 
       CORS_ORIGIN: ${CORS_ORIGIN}
       SECURE_COOKIE: "true"
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # ADMIN_EMAIL / ADMIN_PASSWORD are deliberately NOT passed to the long-running
+      # container; seed with:
+      #   docker compose run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD api /app/api seed
     expose:
       - "8080"
     mem_limit: 1g
+    pids_limit: 256
+    stop_grace_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=512m
     healthcheck:
-      # Restarts a wedged process (not just a crashed one). curl is in the image.
+      # /api/health pings Postgres, so a wedged or DB-less process restarts. curl is in the image.
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s

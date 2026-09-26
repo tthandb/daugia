@@ -18,8 +18,11 @@ VALUES ($1, $2, $3)
 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
 RETURNING *;
 
--- name: DeleteTag :exec
+-- name: DeleteTag :execrows
 DELETE FROM tags WHERE id = $1;
+
+-- name: CountTagsByIDs :one
+SELECT count(*) FROM tags WHERE id = ANY($1::text[]);
 
 -- name: ListTagsByArticle :many
 SELECT t.* FROM tags t

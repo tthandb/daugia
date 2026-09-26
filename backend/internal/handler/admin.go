@@ -1,22 +1,21 @@
 package handler
 
 import (
-	"encoding/json"
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lucsky/cuid"
 	"golang.org/x/text/unicode/norm"
 
@@ -24,21 +23,40 @@ import (
 	"github.com/daugia999/backend/internal/parser"
 )
 
+const (
+	parseTimeout      = 2 * time.Minute
+	defaultAuthorName = "Nguyễn Văn Dương"
+)
+
 func (h *Handler) AdminStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	total, _ := h.queries.AdminCountArticles(ctx, nil)
-	published, _ := h.queries.AdminCountArticlesByStatus(ctx, "PUBLISHED")
-	drafts, _ := h.queries.AdminCountArticlesByStatus(ctx, "DRAFT")
-	archived, _ := h.queries.AdminCountArticlesByStatus(ctx, "ARCHIVED")
-	views, _ := h.queries.AdminTotalViews(ctx)
+	total, err := h.queries.AdminCountArticles(ctx, nil)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+	counts := map[string]int64{}
+	for _, status := range []string{"PUBLISHED", "DRAFT", "ARCHIVED"} {
+		n, err := h.queries.AdminCountArticlesByStatus(ctx, status)
+		if err != nil {
+			writeDBError(w, err, "")
+			return
+		}
+		counts[status] = n
+	}
+	views, err := h.queries.AdminTotalViews(ctx)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"totalArticles": total,
-			"published":     published,
-			"drafts":        drafts,
-			"archived":      archived,
+			"published":     counts["PUBLISHED"],
+			"drafts":        counts["DRAFT"],
+			"archived":      counts["ARCHIVED"],
 			"totalViews":    views,
 		},
 	})
@@ -47,107 +65,53 @@ func (h *Handler) AdminStats(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AdminListArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	limit, offset := parsePageParams(r)
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
+	page := pageNumber(r)
 
 	var status *string
-	if s := r.URL.Query().Get("status"); s != "" {
-		switch s {
-		case "PUBLISHED", "DRAFT", "ARCHIVED":
-			status = &s
-		}
+	switch s := r.URL.Query().Get("status"); s {
+	case "PUBLISHED", "DRAFT", "ARCHIVED":
+		status = &s
 	}
 
-	articles, err := h.queries.AdminListArticles(ctx, db.AdminListArticlesParams{
-		Limit:  limit,
-		Offset: offset,
-		Status: status,
-	})
+	rows, err := h.queries.AdminListArticles(ctx, db.AdminListArticlesParams{Limit: limit, Offset: offset, Status: status})
 	if err != nil {
-		writeError(w, 500, "failed to list articles")
+		writeDBError(w, err, "")
+		return
+	}
+	total, err := h.queries.AdminCountArticles(ctx, status)
+	if err != nil {
+		writeDBError(w, err, "")
 		return
 	}
 
-	total, _ := h.queries.AdminCountArticles(ctx, status)
-
-	items := make([]map[string]any, len(articles))
-	for i, a := range articles {
-		var thumbnailURL *string
-		if a.ThumbnailKey != nil {
-			url := fmt.Sprintf("/api/thumbs/%s", a.ID)
-			thumbnailURL = &url
-		}
-		items[i] = map[string]any{
-			"id":            a.ID,
-			"title":         a.Title,
-			"slug":          a.Slug,
-			"description":   a.Description,
-			"authorName":    a.AuthorName,
-			"status":        a.Status,
-			"publishedAt":   a.PublishedAt,
-			"thumbnailUrl":  thumbnailURL,
-			"viewCount":     a.ViewCount,
-			"categoryId":    a.CategoryID,
-			"categoryName":  a.CategoryName,
-			"categorySlug":  a.CategorySlug,
-			"categoryColor": a.CategoryColor,
-			"createdAt":     a.CreatedAt,
-			"updatedAt":     a.UpdatedAt,
-		}
+	items := make([]map[string]any, len(rows))
+	for i, a := range rows {
+		item := articleListRow(a.ID, a.Title, a.Slug, a.Description, a.AuthorName, a.Status, a.PublishedAt,
+			a.Province, a.District, a.Ward, a.ThumbnailKey, a.ViewCount, a.CategoryName, a.CategorySlug,
+			a.CategoryColor, a.CreatedAt, a.UpdatedAt, a.AuctionStart, a.AuctionEnd, a.StartingPrice)
+		item["categoryId"] = a.CategoryID
+		items[i] = item
 	}
 	writeJSON(w, http.StatusOK, paginatedResponse(items, total, page, int(limit)))
 }
 
 func (h *Handler) AdminGetArticle(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
+	h.writeAdminArticle(w, r.Context(), chi.URLParam(r, "id"), http.StatusOK)
+}
 
+// writeAdminArticle loads an article with its relations and writes the full
+// admin representation. Every admin read/write funnels through here so the
+// response shape is identical across endpoints.
+func (h *Handler) writeAdminArticle(w http.ResponseWriter, ctx context.Context, id string, status int) {
 	article, err := h.queries.GetArticleByID(ctx, id)
 	if err != nil {
-		writeError(w, 404, "article not found")
+		writeDBError(w, err, "article not found")
 		return
 	}
-
-	tags, _ := h.queries.ListTagsByArticle(ctx, article.ID)
-	tagList := make([]map[string]any, len(tags))
-	for i, t := range tags {
-		tagList[i] = map[string]any{"id": t.ID, "name": t.Name, "slug": t.Slug}
-	}
-
-	images, _ := h.queries.ListArticleImages(ctx, article.ID)
-	imageList := make([]map[string]any, len(images))
-	for i, img := range images {
-		imageList[i] = map[string]any{
-			"id":        img.ID,
-			"url":       fmt.Sprintf("/api/images/%s", img.ID),
-			"fileName":  img.FileName,
-			"altText":   img.AltText,
-			"width":     img.Width,
-			"height":    img.Height,
-			"sizeBytes": img.SizeBytes,
-			"sortOrder": img.SortOrder,
-		}
-	}
-
-	attachments, _ := h.queries.ListArticleAttachments(ctx, article.ID)
-	attachList := make([]map[string]any, len(attachments))
-	for i, att := range attachments {
-		attachList[i] = map[string]any{
-			"id":        att.ID,
-			"url":       fmt.Sprintf("/api/articles/%s/attachments/%s", article.ID, att.ID),
-			"fileName":  att.FileName,
-			"fileMime":  att.FileMime,
-			"sizeBytes": att.SizeBytes,
-			"sortOrder": att.SortOrder,
-		}
-	}
-
-	var thumbnailURL *string
-	if article.ThumbnailKey != nil {
-		url := fmt.Sprintf("/api/thumbs/%s", article.ID)
-		thumbnailURL = &url
+	rel, err := h.loadRelated(ctx, article.ID)
+	if err != nil {
+		writeDBError(w, err, "article not found")
+		return
 	}
 
 	result := map[string]any{
@@ -166,7 +130,7 @@ func (h *Handler) AdminGetArticle(w http.ResponseWriter, r *http.Request) {
 		"assetType":        article.AssetType,
 		"plotCount":        article.PlotCount,
 		"totalArea":        article.TotalArea,
-		"thumbnailUrl":     thumbnailURL,
+		"thumbnailUrl":     thumbURL(article.ID, article.ThumbnailKey),
 		"originalFileName": article.OriginalFileName,
 		"originalFileMime": article.OriginalFileMime,
 		"viewCount":        article.ViewCount,
@@ -174,75 +138,86 @@ func (h *Handler) AdminGetArticle(w http.ResponseWriter, r *http.Request) {
 		"categoryName":     article.CategoryName,
 		"categorySlug":     article.CategorySlug,
 		"categoryColor":    article.CategoryColor,
-		"tags":             tagList,
-		"images":           imageList,
-		"attachments":      attachList,
+		"tags":             rel.tags,
+		"images":           rel.images,
+		"attachments":      rel.attachments,
 		"createdAt":        article.CreatedAt,
 		"updatedAt":        article.UpdatedAt,
 		"auctionStart":     article.AuctionStart,
 		"auctionEnd":       article.AuctionEnd,
 		"venueName":        article.VenueName,
 		"venueAddress":     article.VenueAddress,
+		"startingPrice":    article.StartingPrice,
+		"depositAmount":    article.DepositAmount,
 	}
-	if article.StartingPrice.Valid {
-		result["startingPrice"] = article.StartingPrice.Int64
-	}
-	if article.DepositAmount.Valid {
-		result["depositAmount"] = article.DepositAmount.Int64
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{"data": result})
+	writeJSON(w, status, map[string]any{"data": result})
 }
 
 func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Parse multipart form (max 50MB)
-	if err := r.ParseMultipartForm(50 << 20); err != nil {
-		writeError(w, 400, "invalid form data")
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form data")
 		return
 	}
-
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "file is required")
+		writeError(w, http.StatusBadRequest, "file is required")
 		return
 	}
 	defer file.Close()
 
-	// Validate MIME type
 	mime := header.Header.Get("Content-Type")
-	if !isAllowedDocMime(mime) {
-		writeError(w, 400, "unsupported file type, use DOCX or PDF")
+	ext, ok := docExtension(mime)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "unsupported file type, use DOCX or PDF")
+		return
+	}
+	head, err := peekHead(file)
+	if err != nil || !magicMatches(mime, head) {
+		writeError(w, http.StatusBadRequest, "file content does not match its declared type")
 		return
 	}
 
-	// Save to temp file
-	ext := extFromMime(mime)
-	tmpDir, _ := os.MkdirTemp("", "upload-*")
-	defer os.RemoveAll(tmpDir)
-	tmpFile := filepath.Join(tmpDir, "doc"+ext)
-	f, _ := os.Create(tmpFile)
-	io.Copy(f, file)
-	f.Close()
+	slug := r.FormValue("slug")
+	if slug != "" && !validSlug(slug) {
+		writeError(w, http.StatusBadRequest, "slug may only contain a-z, 0-9 and dashes")
+		return
+	}
 
-	// Parse document
+	tmpDir, err := os.MkdirTemp("", "upload-*")
+	if err != nil {
+		log.Printf("mkdir temp: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+	tmpFile, err := spoolUpload(tmpDir, "doc"+ext, file)
+	if err != nil {
+		log.Printf("spool upload: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	parseCtx, cancel := context.WithTimeout(ctx, parseTimeout)
+	defer cancel()
 	var contentHTML, contentPlain string
 	switch ext {
 	case ".docx":
-		contentHTML, contentPlain, err = parser.ParseDOCX(tmpFile)
+		contentHTML, contentPlain, err = parser.ParseDOCX(parseCtx, tmpFile)
 	case ".pdf":
-		contentHTML, contentPlain, err = parser.ParsePDF(tmpFile)
-	default:
-		writeError(w, 400, "unsupported file format")
-		return
+		contentHTML, contentPlain, err = parser.ParsePDF(parseCtx, tmpFile)
 	}
 	if err != nil {
-		writeError(w, 500, fmt.Sprintf("failed to parse document: %v", err))
+		if errors.Is(err, parser.ErrBadDocument) {
+			writeError(w, http.StatusUnprocessableEntity, "không thể đọc nội dung tài liệu; kiểm tra lại file")
+			return
+		}
+		log.Printf("parse %s: %v", header.Filename, err)
+		writeError(w, http.StatusInternalServerError, "document conversion failed")
 		return
 	}
 
-	// Metadata from form
 	title := r.FormValue("title")
 	if title == "" {
 		title = header.Filename
@@ -253,51 +228,39 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 	authorName := r.FormValue("authorName")
 	if authorName == "" {
-		authorName = "Nguyễn Văn Dương"
+		authorName = defaultAuthorName
 	}
-	slug := r.FormValue("slug")
 	if slug == "" {
 		slug = slugifyTitle(title)
 	}
+	if slug == "" {
+		slug = cuid.Slug()
+	}
 
 	articleID := cuid.New()
-
-	// Upload raw file to object storage. If this fails we must NOT create the
-	// article row — otherwise the notice would appear published while its source
-	// document was never stored (permanent data loss).
 	rawKey := fmt.Sprintf("raw/%s%s", articleID, ext)
+	// Store the source document before the row exists: a notice must never be
+	// listed while its file is missing.
 	if _, err := h.uploadLocalFile(ctx, rawKey, tmpFile, mime); err != nil {
+		log.Printf("upload %s: %v", rawKey, err)
 		writeError(w, http.StatusBadGateway, "failed to store document; article not created")
 		return
 	}
 
-	// Create thumbnail via bimg (if we can)
-	// For document uploads, thumbnail is generated later or from first page
-	// For now, leave thumbnail_key nil
-
-	originalFileName := header.Filename
-
-	categoryID := nilStr(r.FormValue("categoryId"))
-	province := nilStr(r.FormValue("province"))
-	district := nilStr(r.FormValue("district"))
-	ward := nilStr(r.FormValue("ward"))
-	assetType := nilStr(r.FormValue("assetType"))
-
-	var plotCount pgtype.Int4
+	var plotCount *int32
 	if pc := r.FormValue("plotCount"); pc != "" {
-		if n, err := strconv.Atoi(pc); err == nil {
-			plotCount = pgtype.Int4{Int32: int32(n), Valid: true}
+		if n, err := strconv.ParseInt(pc, 10, 32); err == nil {
+			v := int32(n)
+			plotCount = &v
 		}
 	}
-	totalArea := nilStr(r.FormValue("totalArea"))
+	originalFileName := header.Filename
 
-	baseSlug := slug
 	var article db.CreateArticleRow
-	err = nil
 	for attempt := 0; attempt < 5; attempt++ {
-		candidate := baseSlug
+		candidate := slug
 		if attempt > 0 {
-			candidate = fmt.Sprintf("%s-%d", baseSlug, attempt+1)
+			candidate = fmt.Sprintf("%s-%d", slug, attempt+1)
 		}
 		article, err = h.queries.CreateArticle(ctx, db.CreateArticleParams{
 			ID:               articleID,
@@ -308,44 +271,36 @@ func (h *Handler) AdminCreateArticle(w http.ResponseWriter, r *http.Request) {
 			ContentHtml:      contentHTML,
 			ContentPlain:     contentPlain,
 			Status:           "DRAFT",
-			Province:         province,
-			District:         district,
-			Ward:             ward,
-			AssetType:        assetType,
+			Province:         nilStr(r.FormValue("province")),
+			District:         nilStr(r.FormValue("district")),
+			Ward:             nilStr(r.FormValue("ward")),
+			AssetType:        nilStr(r.FormValue("assetType")),
 			PlotCount:        plotCount,
-			TotalArea:        totalArea,
-			ThumbnailKey:     nil,
+			TotalArea:        nilStr(r.FormValue("totalArea")),
 			OriginalFileKey:  &rawKey,
 			OriginalFileName: &originalFileName,
 			OriginalFileMime: &mime,
-			LegacyID:         pgtype.Int4{},
-			LegacyFileKey:    nil,
-			CategoryID:       categoryID,
-			PublishedAt:      nil,
+			CategoryID:       nilStr(r.FormValue("categoryId")),
 		})
-		if err == nil {
+		if err == nil || !isUniqueViolation(err) {
 			break
-		}
-		if !isUniqueViolation(err) {
-			break // a non-collision error — don't keep retrying
 		}
 	}
 	if err != nil {
-		// The raw document was already uploaded; remove it so a failed create
-		// doesn't leave an orphaned (billable) object in storage.
 		if delErr := h.store.Delete(ctx, rawKey); delErr != nil {
-			log.Printf("failed to clean up orphaned upload %s: %v", rawKey, delErr)
+			log.Printf("clean up orphaned upload %s: %v", rawKey, delErr)
 		}
-		writeError(w, 500, fmt.Sprintf("failed to create article: %v", err))
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "slug already in use")
+			return
+		}
+		log.Printf("create article: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to create article")
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"id":     article.ID,
-			"slug":   article.Slug,
-			"status": article.Status,
-		},
+		"data": map[string]any{"id": article.ID, "slug": article.Slug, "status": article.Status},
 	})
 }
 
@@ -353,156 +308,247 @@ func (h *Handler) AdminUpdateArticle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	var req struct {
-		Title           *string    `json:"title"`
-		Slug            *string    `json:"slug"`
-		Description     *string    `json:"description"`
-		MetaDescription *string    `json:"metaDescription"`
-		AuthorName      *string    `json:"authorName"`
-		ContentHtml     *string    `json:"contentHtml"`
-		ContentPlain    *string    `json:"contentPlain"`
-		Province        *string    `json:"province"`
-		District        *string    `json:"district"`
-		Ward            *string    `json:"ward"`
-		AssetType       *string    `json:"assetType"`
-		PlotCount       *int32     `json:"plotCount"`
-		TotalArea       *string    `json:"totalArea"`
-		CategoryID      *string    `json:"categoryId"`
-		AuctionStart    *time.Time `json:"auctionStart"`
-		AuctionEnd      *time.Time `json:"auctionEnd"`
-		VenueName       *string    `json:"venueName"`
-		VenueAddress    *string    `json:"venueAddress"`
-		StartingPrice   *int64     `json:"startingPrice"`
-		DepositAmount   *int64     `json:"depositAmount"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, 400, "invalid request body")
+	var body patch
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	var plotCount pgtype.Int4
-	if req.PlotCount != nil {
-		plotCount = pgtype.Int4{Int32: *req.PlotCount, Valid: true}
-	}
-	var startingPrice pgtype.Int8
-	if req.StartingPrice != nil {
-		startingPrice = pgtype.Int8{Int64: *req.StartingPrice, Valid: true}
-	}
-	var depositAmount pgtype.Int8
-	if req.DepositAmount != nil {
-		depositAmount = pgtype.Int8{Int64: *req.DepositAmount, Valid: true}
-	}
-
-	article, err := h.queries.UpdateArticle(ctx, db.UpdateArticleParams{
-		ID:              id,
-		Title:           req.Title,
-		Slug:            req.Slug,
-		Description:     req.Description,
-		MetaDescription: req.MetaDescription,
-		AuthorName:      req.AuthorName,
-		ContentHtml:     req.ContentHtml,
-		ContentPlain:    req.ContentPlain,
-		Province:        req.Province,
-		District:        req.District,
-		Ward:            req.Ward,
-		AssetType:       req.AssetType,
-		PlotCount:       plotCount,
-		TotalArea:       req.TotalArea,
-		ThumbnailKey:    nil,
-		CategoryID:      req.CategoryID,
-		AuctionStart:    req.AuctionStart,
-		AuctionEnd:      req.AuctionEnd,
-		VenueName:       req.VenueName,
-		VenueAddress:    req.VenueAddress,
-		StartingPrice:   startingPrice,
-		DepositAmount:   depositAmount,
-	})
+	params, err := buildUpdateParams(id, body)
 	if err != nil {
-		writeError(w, 500, "failed to update article")
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": article})
+	if _, err := h.queries.UpdateArticle(ctx, params); err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "slug already in use")
+			return
+		}
+		writeDBError(w, err, "article not found")
+		return
+	}
+	h.writeAdminArticle(w, ctx, id, http.StatusOK)
+}
+
+func buildUpdateParams(id string, body patch) (db.UpdateArticleParams, error) {
+	p := db.UpdateArticleParams{ID: id}
+	var err error
+
+	if p.SetTitle, p.Title, err = body.requiredText("title"); err != nil {
+		return p, err
+	}
+	if p.SetDescription, p.Description, err = body.requiredText("description"); err != nil {
+		return p, err
+	}
+	if p.SetAuthorName, p.AuthorName, err = body.requiredText("authorName"); err != nil {
+		return p, err
+	}
+	if p.SetSlug, p.Slug, err = body.requiredText("slug"); err != nil {
+		return p, err
+	}
+	if p.SetSlug && !validSlug(*p.Slug) {
+		return p, errors.New("slug may only contain a-z, 0-9 and dashes")
+	}
+
+	optional := []struct {
+		key string
+		set *bool
+		dst **string
+	}{
+		{"province", &p.SetProvince, &p.Province},
+		{"district", &p.SetDistrict, &p.District},
+		{"ward", &p.SetWard, &p.Ward},
+		{"assetType", &p.SetAssetType, &p.AssetType},
+		{"totalArea", &p.SetTotalArea, &p.TotalArea},
+		{"categoryId", &p.SetCategoryID, &p.CategoryID},
+		{"metaDescription", &p.SetMetaDescription, &p.MetaDescription},
+		{"venueName", &p.SetVenueName, &p.VenueName},
+		{"venueAddress", &p.SetVenueAddress, &p.VenueAddress},
+	}
+	for _, f := range optional {
+		if *f.set, *f.dst, err = body.optionalText(f.key); err != nil {
+			return p, err
+		}
+	}
+
+	if p.SetPlotCount, p.PlotCount, err = body.optionalInt32("plotCount"); err != nil {
+		return p, err
+	}
+	if p.SetStartingPrice, p.StartingPrice, err = body.optionalInt64("startingPrice"); err != nil {
+		return p, err
+	}
+	if p.SetDepositAmount, p.DepositAmount, err = body.optionalInt64("depositAmount"); err != nil {
+		return p, err
+	}
+	if p.SetAuctionStart, p.AuctionStart, err = body.optionalTime("auctionStart"); err != nil {
+		return p, err
+	}
+	if p.SetAuctionEnd, p.AuctionEnd, err = body.optionalTime("auctionEnd"); err != nil {
+		return p, err
+	}
+
+	// Hand-edited HTML is sanitized with the same policy as parsed documents,
+	// and the plain-text copy (search index) is always derived server-side.
+	if set, html, err := body.optionalText("contentHtml"); err != nil {
+		return p, err
+	} else if set {
+		clean, plain := "", ""
+		if html != nil {
+			clean = parser.SanitizeHTML(*html)
+			plain = parser.StripHTML(*html)
+		}
+		p.SetContentHtml, p.ContentHtml = true, &clean
+		p.SetContentPlain, p.ContentPlain = true, &plain
+	}
+	return p, nil
 }
 
 func (h *Handler) AdminDeleteArticle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	// Get article to find file keys
 	article, err := h.queries.GetArticleByID(ctx, id)
 	if err != nil {
-		writeError(w, 404, "article not found")
+		writeDBError(w, err, "article not found")
 		return
 	}
 
-	// Delete files from MinIO
-	if article.OriginalFileKey != nil {
-		_ = h.store.Delete(ctx, *article.OriginalFileKey)
-	}
-	if article.ThumbnailKey != nil {
-		_ = h.store.Delete(ctx, *article.ThumbnailKey)
-	}
-	// Delete all images and attachments
-	_ = h.store.DeletePrefix(ctx, fmt.Sprintf("images/%s/", id))
-	_ = h.store.DeletePrefix(ctx, fmt.Sprintf("attachments/%s/", id))
-
-	// Delete article (cascades to images, attachments, tags, views)
-	if err := h.queries.DeleteArticle(ctx, id); err != nil {
-		writeError(w, 500, "failed to delete article")
+	// Delete the row first (cascades to images, attachments, tags, views). Only
+	// once the notice is gone from the database do we drop its objects: a
+	// failure here must not leave a published article whose files are missing.
+	rows, err := h.queries.DeleteArticle(ctx, id)
+	if err != nil {
+		writeDBError(w, err, "article not found")
 		return
+	}
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "article not found")
+		return
+	}
+
+	for _, key := range []*string{article.OriginalFileKey, article.ThumbnailKey} {
+		if key != nil {
+			if err := h.store.Delete(ctx, *key); err != nil {
+				log.Printf("delete object %s: %v", *key, err)
+			}
+		}
+	}
+	for _, prefix := range []string{fmt.Sprintf("images/%s/", id), fmt.Sprintf("attachments/%s/", id)} {
+		if err := h.store.DeletePrefix(ctx, prefix); err != nil {
+			log.Printf("delete prefix %s: %v", prefix, err)
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) AdminPublishArticle(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if err := h.queries.PublishArticle(r.Context(), id); err != nil {
-		writeError(w, 500, "failed to publish article")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "published"})
+	h.statusChange(w, r, "published", h.queries.PublishArticle)
 }
 
 func (h *Handler) AdminUnpublishArticle(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if err := h.queries.UnpublishArticle(r.Context(), id); err != nil {
-		writeError(w, 500, "failed to unpublish article")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "unpublished"})
+	h.statusChange(w, r, "unpublished", h.queries.UnpublishArticle)
 }
 
 func (h *Handler) AdminArchiveArticle(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if err := h.queries.ArchiveArticle(r.Context(), id); err != nil {
-		writeError(w, 500, "failed to archive article")
+	h.statusChange(w, r, "archived", h.queries.ArchiveArticle)
+}
+
+func (h *Handler) statusChange(w http.ResponseWriter, r *http.Request, message string, fn func(context.Context, string) (int64, error)) {
+	rows, err := fn(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeDBError(w, err, "article not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "archived"})
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "article not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": message})
+}
+
+// AdminSetArticleTags replaces the article's tag set atomically.
+func (h *Handler) AdminSetArticleTags(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+
+	var req struct {
+		TagIDs []string `json:"tagIds"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	unique := make([]string, 0, len(req.TagIDs))
+	seen := map[string]bool{}
+	for _, t := range req.TagIDs {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			unique = append(unique, t)
+		}
+	}
+
+	if _, err := h.queries.GetArticleByID(ctx, id); err != nil {
+		writeDBError(w, err, "article not found")
+		return
+	}
+	n, err := h.queries.CountTagsByIDs(ctx, unique)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+	if int(n) != len(unique) {
+		writeError(w, http.StatusBadRequest, "unknown tag id")
+		return
+	}
+
+	err = h.inTx(ctx, func(q *db.Queries) error {
+		if err := q.RemoveAllArticleTags(ctx, id); err != nil {
+			return err
+		}
+		for _, tagID := range unique {
+			if err := q.AddArticleTag(ctx, db.AddArticleTagParams{ArticleID: id, TagID: tagID}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+
+	tags, err := h.queries.ListTagsByArticle(ctx, id)
+	if err != nil {
+		writeDBError(w, err, "")
+		return
+	}
+	items := make([]map[string]any, len(tags))
+	for i, t := range tags {
+		items[i] = map[string]any{"id": t.ID, "name": t.Name, "slug": t.Slug}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": items})
 }
 
 func (h *Handler) AdminRawFileURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id := chi.URLParam(r, "id")
-
-	article, err := h.queries.GetArticleByID(ctx, id)
+	article, err := h.queries.GetArticleByID(ctx, chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, 404, "article not found")
+		writeDBError(w, err, "article not found")
 		return
 	}
 	if article.OriginalFileKey == nil {
-		writeError(w, 404, "no original file")
+		writeError(w, http.StatusNotFound, "no original file")
 		return
 	}
 
 	url, err := h.store.PresignedURL(ctx, *article.OriginalFileKey, 5*time.Minute)
 	if err != nil {
-		writeError(w, 500, "failed to generate URL")
+		log.Printf("presign %s: %v", *article.OriginalFileKey, err)
+		writeError(w, http.StatusBadGateway, "failed to generate URL")
 		return
 	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"url":      url,
@@ -514,45 +560,58 @@ func (h *Handler) AdminRawFileURL(w http.ResponseWriter, r *http.Request) {
 
 // --- Helpers ---
 
-func isAllowedDocMime(mime string) bool {
-	allowed := map[string]bool{
-		"application/pdf": true,
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
-		"application/msword": true,
-	}
-	return allowed[mime]
-}
-
-func extFromMime(mime string) string {
+func docExtension(mime string) (string, bool) {
 	switch mime {
 	case "application/pdf":
-		return ".pdf"
-	case "application/msword":
-		return ".doc"
-	default:
-		return ".docx"
+		return ".pdf", true
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return ".docx", true
 	}
+	return "", false
 }
 
-// isUniqueViolation reports whether err is a Postgres unique-constraint error
-// (SQLSTATE 23505), used to retry slug generation on collision.
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+// peekHead reads the first bytes of an upload for type sniffing and rewinds.
+func peekHead(f multipart.File) ([]byte, error) {
+	head := make([]byte, 512)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return head[:n], nil
+}
+
+// magicMatches checks that the bytes really are what the client claims. The
+// browser-supplied Content-Type is otherwise trivially forgeable.
+func magicMatches(mime string, head []byte) bool {
+	switch mime {
+	case "application/pdf":
+		return bytes.HasPrefix(head, []byte("%PDF-"))
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return bytes.HasPrefix(head, []byte("PK\x03\x04"))
+	case "application/msword", "application/vnd.ms-excel":
+		return bytes.HasPrefix(head, []byte{0xD0, 0xCF, 0x11, 0xE0})
+	case "image/jpeg", "image/png", "image/webp":
+		return http.DetectContentType(head) == mime
+	case "text/csv":
+		return strings.HasPrefix(http.DetectContentType(head), "text/plain")
+	}
+	return false
 }
 
 // slugifyTitle produces a URL-safe slug from a Vietnamese title. Diacritics are
 // transliterated to their base ASCII letter (NFD + strip combining marks) rather
-// than dropped, so "Thông báo đấu giá" becomes "thong-bao-dau-gia" instead of a
-// mangled, collision-prone "thng-bo-u-gi".
+// than dropped, so "Thông báo đấu giá" becomes "thong-bao-dau-gia".
 func slugifyTitle(title string) string {
-	// Decompose accented runes into base letter + combining marks, then drop the marks.
 	decomposed := norm.NFD.String(title)
 
 	var b strings.Builder
 	prevDash := false
 	for _, r := range decomposed {
-		if unicode.Is(unicode.Mn, r) { // Mn = nonspacing combining mark
+		if unicode.Is(unicode.Mn, r) {
 			continue
 		}
 		switch {
@@ -570,8 +629,6 @@ func slugifyTitle(title string) string {
 				b.WriteByte('-')
 				prevDash = true
 			}
-		default:
-			// drop other punctuation/symbols
 		}
 	}
 	return strings.Trim(b.String(), "-")
