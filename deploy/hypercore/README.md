@@ -62,6 +62,8 @@ apt update && apt install -y ufw fail2ban unattended-upgrades
 ufw default deny incoming && ufw default allow outgoing
 ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
 ufw --force enable
+# Only Caddy may reach the API: never `ufw allow 8080` and never publish 8080
+# from docker-compose (the container uses `expose:`, not `ports:`).
 dpkg-reconfigure -plow unattended-upgrades
 
 curl -fsSL https://get.docker.com | sh
