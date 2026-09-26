@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "deploy/hypercore/**"
+      - "!deploy/hypercore/README.md"
       - ".github/workflows/deploy.yml"
   pull_request:
     paths:

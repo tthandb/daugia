@@ -47,9 +47,16 @@ cp /root/.ssh/authorized_keys /home/daugia/.ssh/
 chown -R daugia:daugia /home/daugia/.ssh
 chmod 700 /home/daugia/.ssh && chmod 600 /home/daugia/.ssh/authorized_keys
 
-sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-systemctl restart ssh
+# Ubuntu cloud images ship drop-ins under /etc/ssh/sshd_config.d/ that re-enable
+# password and root login and override sshd_config. sshd keeps the FIRST value it
+# reads and includes the drop-ins in name order, so a 00- file wins.
+cat > /etc/ssh/sshd_config.d/00-hardening.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+EOF
+sshd -t && systemctl reload ssh
+sshd -T | grep -iE '^(passwordauthentication|permitrootlogin) '   # both must say "no"
 
 apt update && apt install -y ufw fail2ban unattended-upgrades
 ufw default deny incoming && ufw default allow outgoing
